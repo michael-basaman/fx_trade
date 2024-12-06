@@ -94,6 +94,7 @@ void read(tick_vector &data, const char *filename, float point_value, size_t *by
 			*bytes_read = buffer_size;
 		}
 		delete [] buffer;
+	}
 }
 
 }  // namespace n47
