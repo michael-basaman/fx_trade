@@ -46,11 +46,6 @@ int main(void) {
     std::string currency("EURUSD");
     n47::tick_vector data;
 
-//    for(int year = 2008; year < 2025; ++year) {
-//    	for(int month = 0; month < 12; ++month) {
-//    		for(int day = 1; day < 32; ++day) {
-//    			for(int hour = 0; hour < 24; ++hour) {
-
     int unzipped = 0;
     int processed = 0;
 
@@ -71,14 +66,10 @@ int main(void) {
     			    memset(ofilename, 0, 256);
 					snprintf(ofilename, 255, "/media/sf_VirtualBox/tickstory/%s_csv/%4d/%02d/%02d/%02dh_ticks.csv", currency.c_str(), year, month, day, hour);
 
-					bool outputExists = false;
-
 					fs::path opath(ofilename);
 					if (fs::exists(opath)) {
-						// std::cout << "WARN  - output file already exists: " << ofilename << std::endl;
-						output_file_count++;
-						outputExists = true;
-						// continue;
+						std::cout << "WARN  - output file already exists: " << ofilename << std::endl;
+						continue;
 					}
 
     			    char filename[256];
@@ -87,27 +78,16 @@ int main(void) {
 
 					fs::path p(filename);
 					if (!fs::exists(p) || !fs::is_regular(p)) {
-						// std::cout << "WARN  - couldn't access the data file: " << filename <<  std::endl;
+						std::cout << "WARN  - couldn't access the data file: " << filename <<  std::endl;
 						continue;
 					}
 
 					buffer_size = fs::file_size(p);
 
 					if(buffer_size == 0) {
-						// std::cout << "ERROR - empty data file: " << filename << std::endl;
+						std::cout << "ERROR - empty data file: " << filename << std::endl;
 						continue;
 					}
-
-					input_file_count++;
-
-					if(!outputExists) {
-						std::cout << filename << std::endl;
-					}
-
-					if(input_file_count % 1000 == 0) {
-						std::cout << input_file_count << std::endl;
-					}
-					continue;
 
 					unsigned char buffer[buffer_size];
 
@@ -159,14 +139,10 @@ int main(void) {
 						}
 					}
 
-
-
 					std::ifstream fin;
 					fin.open(filename, std::ifstream::binary);
 					fin.read(reinterpret_cast<char*>(buffer), buffer_size);
 					fin.close();
-
-					// pt::ptime epoch(gr::date(2012, 12, 3), pt::hours(1));
 
 					data.clear();
 					n47::read_bi5(data,
@@ -177,7 +153,7 @@ int main(void) {
 
 					if (data.size() == 0) {
 						std::cout << "ERROR - Failed to load the data: " << filename << std::endl;
-						// continue;
+
 						char filename2[256];
 						memset(filename2, 0, 256);
 						snprintf(filename2, 255, "/media/sf_VirtualBox/tickstory/%s/%4d/%02d/%02d/%02dh_ticks", currency.c_str(), year, month, day, hour);
@@ -201,7 +177,6 @@ int main(void) {
 							pid_t pid = fork();
 
 							if (pid == 0) {
-								// Child process
 								char *args[] = {extract_script, data_dir, bi5_filename, NULL};
 								execv(extract_script, args);
 								std::cout << "ERROR  - execv failed" <<  std::endl;
@@ -216,7 +191,7 @@ int main(void) {
 
 							fs::path p3(filename2);
 							if (!fs::exists(p3) || !fs::is_regular(p3)) {
-								std::cout << "WARN  - couldn't access the decompressed file 2: " << filename2 <<  std::endl;
+								std::cout << "WARN  - couldn't access the decompressed after unzip: " << filename2 <<  std::endl;
 								continue;
 							}
 						}
@@ -262,8 +237,6 @@ int main(void) {
 						unzipped++;
 					}
 
-					// fout << "time, bid, bid_vol, ask, ask_vol" << std::endl;
-
 					counter = 0;
 					for (iter = data.begin(); iter != data.end(); iter++) {
 						fout << iter->td << ", "
@@ -275,13 +248,10 @@ int main(void) {
 					fout.close();
 
 					std::cout << "INFO  - wrote " << counter << " records to csv: " << ofilename << std::endl;
-
-					// delete data;
     			}
     		}
     	}
     }
 
-    std::cout << "INFO - input_file_count: " << input_file_count << ", output_file_count: " << output_file_count <<  std::endl;
     std::cout << "INFO - processed: " << processed << ", unzipped: " << unzipped <<  std::endl;
 }
