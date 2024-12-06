@@ -49,9 +49,6 @@ int main(void) {
     int unzipped = 0;
     int processed = 0;
 
-    long input_file_count = 0;
-    long output_file_count = 0;
-
     for(int year = 2003; year < 2025; ++year) {
     	for(int month = 0; month < 12; ++month) {
     		for(int day = 0; day < 32; ++day) {
