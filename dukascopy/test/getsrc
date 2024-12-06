@@ -1,0 +1,3 @@
+#! /bin/sh
+
+cp /media/sf_VirtualBox/workspace/read_bi5/read_bi5.cpp ~/git/dukascopy/test/
