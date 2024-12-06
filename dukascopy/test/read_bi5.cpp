@@ -42,7 +42,6 @@ namespace gr = boost::gregorian;
 
 
 int main(void) {
-
 	std::string currency("EURUSD");
 	n47::tick_vector data;
 
