@@ -43,24 +43,24 @@ namespace gr = boost::gregorian;
 
 int main(void) {
 
-    std::string currency("EURUSD");
-    n47::tick_vector data;
+	std::string currency("EURUSD");
+	n47::tick_vector data;
 
-    int unzipped = 0;
-    int processed = 0;
+	int unzipped = 0;
+	int processed = 0;
 
-    for(int year = 2003; year < 2025; ++year) {
-    	for(int month = 0; month < 12; ++month) {
-    		for(int day = 0; day < 32; ++day) {
-    			for(int hour = 0; hour < 24; ++hour) {
-    				size_t buffer_size;
-    				size_t buffer_size2;
-    			    int counter;
-    			    size_t raw_size = 0;
+	for(int year = 2003; year < 2025; ++year) {
+		for(int month = 0; month < 12; ++month) {
+			for(int day = 0; day < 32; ++day) {
+				for(int hour = 0; hour < 24; ++hour) {
+					size_t buffer_size;
+					size_t buffer_size2;
+					int counter;
+					size_t raw_size = 0;
 
-    			    char ofilename[256];
+					char ofilename[256];
 
-    			    memset(ofilename, 0, 256);
+					memset(ofilename, 0, 256);
 					snprintf(ofilename, 255, "/media/sf_VirtualBox/tickstory/%s_csv/%4d/%02d/%02d/%02dh_ticks.csv", currency.c_str(), year, month, day, hour);
 
 					fs::path opath(ofilename);
@@ -69,7 +69,7 @@ int main(void) {
 						continue;
 					}
 
-    			    char filename[256];
+					char filename[256];
 					memset(filename, 0, 256);
 					snprintf(filename, 255, "/media/sf_VirtualBox/tickstory/%s/%4d/%02d/%02d/%02dh_ticks.bi5", currency.c_str(), year, month, day, hour);
 
@@ -245,10 +245,10 @@ int main(void) {
 					fout.close();
 
 					std::cout << "INFO  - wrote " << counter << " records to csv: " << ofilename << std::endl;
-    			}
-    		}
-    	}
-    }
+				}
+			}
+		}
+	}
 
-    std::cout << "INFO - processed: " << processed << ", unzipped: " << unzipped <<  std::endl;
+	std::cout << "INFO - processed: " << processed << ", unzipped: " << unzipped <<  std::endl;
 }
