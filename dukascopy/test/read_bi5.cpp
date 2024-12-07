@@ -28,6 +28,9 @@ You should have received a copy of the GNU General Public License along with
 #include <fstream>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <pqxx/pqxx>
+#include <set>
+#include <string>
 
 #define STRINGIZE(x) #x
 #define STRINGIZE_VALUE_OF(x) STRINGIZE(x)
@@ -47,24 +50,88 @@ int main(void) {
 
 	int unzipped = 0;
 	int processed = 0;
+	int already_loaded = 0;
+	int empty_seen = 0;
+	int couldnt_access = 0;
+	int count = 0;
+
+	pqxx::connection conn("postgresql://fx:fx@10.0.2.2/fx");
+
+	pqxx::nontransaction txn(conn);
+
+	std::string find_from("C:/VirtualBox/");
+	std::string find_to("/media/sf_VirtualBox/");
+	size_t str_pos = 0;
+
+	std::set<std::string> filenames;
+	pqxx::result res = txn.exec("SELECT filename FROM hours");
+
+	for (const auto& row : res) {
+		std::string replace_str = row["filename"].as<std::string>();
+
+		str_pos = replace_str.find(find_from);
+		if (str_pos != std::string::npos) {
+			replace_str.replace(str_pos, find_from.length(), find_to);
+		}
+
+		filenames.insert(replace_str);
+	}
+
+	std::set<std::string> empty_filenames;
+	pqxx::result res2 = txn.exec("SELECT filename FROM empty_hours");
+
+	for (const auto& row2 : res2) {
+		std::string replace_str = row2["filename"].as<std::string>();
+
+		str_pos = replace_str.find(find_from);
+		if (str_pos != std::string::npos) {
+			replace_str.replace(str_pos, find_from.length(), find_to);
+		}
+
+		empty_filenames.insert(replace_str);
+	}
 
 	for(int year = 2003; year < 2025; ++year) {
 		for(int month = 0; month < 12; ++month) {
-			for(int day = 0; day < 32; ++day) {
+			for(int day = 1; day < 32; ++day) {
+				// November, April, June, and September are the months with 30 days , February has 28 days (29 days in the leap year)
+				if(month == 10 || month == 3 || month == 5 || month == 8) {
+					if(day > 30) {
+						continue;
+					}
+				} else if(month == 1) {
+					if(year % 4 == 0) {
+						if(day > 29) {
+							continue;
+						}
+					} else {
+						if(day > 28) {
+							continue;
+						}
+					}
+				}
+
 				for(int hour = 0; hour < 24; ++hour) {
+					count++;
+
+					if(count % 1000 == 0) {
+						std::cout << "count: " << count << ", processed: " << processed << ", already_loaded: " << already_loaded
+								<< ", empty_seen: " << empty_seen << ", couldnt_access: " << couldnt_access << std::endl;
+					}
+
 					size_t buffer_size;
 					size_t buffer_size2;
 					int counter;
 					size_t raw_size = 0;
 
 					char ofilename[256];
-
 					memset(ofilename, 0, 256);
 					snprintf(ofilename, 255, "/media/sf_VirtualBox/tickstory/%s_csv/%4d/%02d/%02d/%02dh_ticks.csv", currency.c_str(), year, month, day, hour);
 
-					fs::path opath(ofilename);
-					if (fs::exists(opath)) {
-						std::cout << "WARN  - output file already exists: " << ofilename << std::endl;
+					std::set<std::string>::iterator find_iter = filenames.find(ofilename);
+					if(find_iter != filenames.end()) {
+						// std::cout << "INFO  - output file already loaded: " << ofilename << std::endl;
+						already_loaded++;
 						continue;
 					}
 
@@ -72,9 +139,23 @@ int main(void) {
 					memset(filename, 0, 256);
 					snprintf(filename, 255, "/media/sf_VirtualBox/tickstory/%s/%4d/%02d/%02d/%02dh_ticks.bi5", currency.c_str(), year, month, day, hour);
 
+					std::set<std::string>::iterator empty_find_iter = empty_filenames.find(filename);
+					if(empty_find_iter != empty_filenames.end()) {
+						// std::cout << "INFO  - empty data file already seen: " << filename << std::endl;
+						empty_seen++;
+						continue;
+					}
+
+					fs::path opath(ofilename);
+					if (fs::exists(opath)) {
+						std::cout << "WARN  - output file already exists: " << ofilename << std::endl;
+						continue;
+					}
+
 					fs::path p(filename);
 					if (!fs::exists(p) || !fs::is_regular(p)) {
 						std::cout << "WARN  - couldn't access the data file: " << filename <<  std::endl;
+						couldnt_access++;
 						continue;
 					}
 
@@ -248,6 +329,9 @@ int main(void) {
 			}
 		}
 	}
+
+	std::cout << "count: " << count << ", processed: " << processed << ", already_loaded: " << already_loaded
+									<< ", empty_seen: " << empty_seen << ", couldnt_access: " << couldnt_access << std::endl;
 
 	std::cout << "INFO - processed: " << processed << ", unzipped: " << unzipped <<  std::endl;
 }

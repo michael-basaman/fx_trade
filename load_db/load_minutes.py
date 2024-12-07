@@ -19,8 +19,9 @@ for record in records:
 
     cursor2.execute("""
       SELECT fx_datetime, bid, ask
-        FROM seconds
-       WHERE fx_datetime between %s and %s
+        FROM ticks
+       WHERE fx_datetime >= %s
+         AND fx_datetime < %s
     ORDER BY fx_datetime
     """, (start_time, end_time,))
 
@@ -38,9 +39,6 @@ for record in records:
         ask = record2[2]
 
         minute = fx_datetime.replace(second=0, microsecond=0)
-
-        fx_datetime.strftime("%Y-%m-%d %H:%M:%S")
-        minute.strftime("%Y-%m-%d %H:%M:%S")
 
         if minute not in minutes_dict:
             minutes_array.append(minute)

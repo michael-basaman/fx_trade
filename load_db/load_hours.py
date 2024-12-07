@@ -1,5 +1,6 @@
 import psycopg2
 import os
+import datetime
 
 conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
 
@@ -36,7 +37,7 @@ for year in range(2050):
                 filename = f"C:/VirtualBox/tickstory/EURUSD_csv/{year_str}/{month_index_str}/{day_str}/{hour_str}h_ticks.csv"
 
                 if os.path.isfile(filename):
-                    cursor.execute("SELECT 1 FROM hours WHERE filename = %s and loaded IS TRUE", (filename,))
+                    cursor.execute("SELECT 1 FROM hours WHERE filename = %s", (filename,))
                     exists = cursor.fetchone()
 
                     if exists is not None:
@@ -67,12 +68,14 @@ for year in range(2050):
                             bid = int((float(stripped_tokens[1]) * 10000.0) + 0.01)
                             ask = int((float(stripped_tokens[3]) * 10000.0) + 0.01)
 
-                            datetime_str = f"{date_str} {hour_str}:{'{:02}'.format(minutes)}:{'{:02}'.format(seconds)}.{'{:03}'.format(millis)}"
+                            datetime_str = f"{date_str} {hour_str}:{'{:02}'.format(minutes)}:{'{:02}'.format(seconds)}.{'{:03}'.format(millis)} UTC"
 
                             sql = f"INSERT INTO ticks(fx_datetime, bid, ask) VALUES (%s, %s, %s)"
                             cursor.execute(sql, (datetime_str, bid, ask,))
 
-                        cursor.execute("INSERT INTO hours (filename, fx_date, fx_hour, loaded) VALUES (%s, %s, %s, TRUE)", (filename,date_str, hour,))
+                        hour_datetime_str = f"{date_str} {hour_str}:00:00 UTC"
+
+                        cursor.execute("INSERT INTO hours (fx_datetime, filename) VALUES (%s, %s)", (hour_datetime_str, filename,))
                         conn.commit()
 
                         print(filename, count)
