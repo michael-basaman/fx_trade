@@ -39,6 +39,7 @@ cursor = conn.cursor()
 cursor2 = conn.cursor()
 cursor3 = conn.cursor()
 cursor4 = conn.cursor()
+cursor5 = conn.cursor()
 
 cursor.execute("""
 SELECT start_time, end_time
@@ -53,6 +54,8 @@ all_sessions = []
 
 for week in weeks:
     week_minutes = []
+
+    print(week[0])
 
     cursor4.execute("""
     SELECT start_time, end_time
@@ -130,6 +133,9 @@ for week_minutes in all_minutes:
         week_minutes[week_index].append(week_minutes[week_index][2] - avg)
         week_index = week_index + 1
 
+elapsed_time = time.time() - start_time
+print(f"elapsed_time: {elapsed_time}")
+
 sum_sma = 0
 count_sma = 0
 
@@ -184,5 +190,30 @@ stddev = math.sqrt(var)
 
 print(f"stddev: {stddev}")
 
+if stddev == 0:
+    exit(1)
+
 elapsed_time = time.time() - start_time
 print(f"elapsed_time: {elapsed_time}")
+
+update_count = 0
+for week_minutes in all_minutes:
+    for minute in week_minutes:
+        if minute[0] == 0:
+            continue
+
+        cursor5.execute("""
+        UPDATE minutes
+        SET sma_50 = %s
+        WHERE fx_datetime = %s
+        """, ((minute[6] - average_sma) / stddev, minute[0]))
+
+        update_count = update_count + 1
+
+    conn.commit()
+    print(f"update_count: {update_count}")
+
+elapsed_time = time.time() - start_time
+print(f"elapsed_time: {elapsed_time}")
+
+
