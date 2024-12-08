@@ -112,23 +112,22 @@ total_count = 0
 for week_minutes in all_minutes:
     week_index = 0
 
-    if len(week_minutes) < 50:
+    if len(week_minutes) < 26:
         while week_index < len(week_minutes):
             week_minutes[week_index].append(0)
             week_index = week_index + 1
         continue
 
-    while week_index < 49:
+    while week_index < 25:
         week_minutes[week_index].append(0)
         week_minutes[week_index].append(0)
         week_index = week_index + 1
 
-    # 49
     while week_index < len(week_minutes):
         sum = 0
-        for i in range(week_index - 49, week_index + 1):
+        for i in range(week_index - 25, week_index + 1):
             sum = sum + week_minutes[i][2]
-        avg = sum / 50.0
+        avg = sum / 26.0
         week_minutes[week_index].append(avg)
         week_minutes[week_index].append(week_minutes[week_index][2] - avg)
         week_index = week_index + 1
@@ -204,7 +203,7 @@ for week_minutes in all_minutes:
 
         cursor5.execute("""
         UPDATE minutes
-        SET sma_50 = %s
+        SET sma_26 = %s
         WHERE fx_datetime = %s
         """, ((minute[6] - average_sma) / stddev, minute[0]))
 
