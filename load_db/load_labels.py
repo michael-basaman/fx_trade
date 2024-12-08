@@ -20,111 +20,116 @@ cursor.execute("SELECT start_time, end_time FROM weeks WHERE minutes > 0 order b
 
 weeks = cursor.fetchall()
 
-pips = 2000
-total_count = 0
+for pips_i in range(10,36):
+    total_count = 0
 
-for week in weeks:
-    count = 0
-
-    cursor2.execute("""
-          SELECT fx_datetime, bid, ask FROM ticks
-           WHERE fx_datetime >= %s
-             AND fx_datetime < %s
-        ORDER BY fx_datetime
-        """, (week[0], week[1],))
-
-    ticks = cursor2.fetchall()
-
-    if len(ticks) == 0:
+    pips = pips_i * 100
+    if pips == 2000:
         continue
 
-    cursor3.execute("""
-      SELECT start_time, end_time
-        FROM sessions
-       WHERE start_time > %s
-         AND end_time < %s
-    ORDER BY start_time
-      """, (week[0], week[1],))
+    for week in weeks:
+        count = 0
 
-    sessions = cursor3.fetchall()
+        cursor2.execute("""
+              SELECT fx_datetime, bid, ask FROM ticks
+               WHERE fx_datetime >= %s
+                 AND fx_datetime < %s
+            ORDER BY fx_datetime
+            """, (week[0], week[1],))
 
-    for session in sessions:
-        cursor4.execute("""
-          SELECT fx_datetime
-            FROM minutes
-           WHERE fx_datetime >= %s
-             AND fx_datetime < %s
-        ORDER BY fx_datetime
-        """, (session[0], session[1],))
+        ticks = cursor2.fetchall()
 
-        minutes = cursor4.fetchall()
-
-        if len(minutes) == 0:
+        if len(ticks) == 0:
             continue
 
-        tick_start = 0
-        for minute in minutes:
-            while tick_start < len(ticks):
-                if ticks[tick_start][0] < minute[0]:
-                    tick_start = tick_start + 1
-                else:
-                    break
+        cursor3.execute("""
+          SELECT start_time, end_time
+            FROM sessions
+           WHERE start_time > %s
+             AND end_time < %s
+        ORDER BY start_time
+          """, (week[0], week[1],))
 
-            if tick_start >= len(ticks):
+        sessions = cursor3.fetchall()
+
+        for session in sessions:
+            cursor4.execute("""
+              SELECT fx_datetime
+                FROM minutes
+               WHERE fx_datetime >= %s
+                 AND fx_datetime < %s
+            ORDER BY fx_datetime
+            """, (session[0], session[1],))
+
+            minutes = cursor4.fetchall()
+
+            if len(minutes) == 0:
                 continue
-            elif tick_start <= 1:
-                tick_start = 0
-                continue
 
-            tick_index = tick_start
-            tick_start = tick_start - 1
+            tick_start = 0
 
-            initial_bid = ticks[tick_index][1]
-            initial_ask = ticks[tick_index][2]
-            tick_index = tick_index + 1
+            for minute in minutes:
+                while tick_start < len(ticks):
+                    if ticks[tick_start][0] < minute[0]:
+                        tick_start = tick_start + 1
+                    else:
+                        break
 
-            shouldBuy = True
-            shouldSell = True
-            buyWins = False
-            sellWins = False
+                if tick_start >= len(ticks):
+                    continue
+                elif tick_start <= 1:
+                    tick_start = 0
+                    continue
 
-            while tick_index < len(ticks):
-                buy_profit = ticks[tick_index][1] - initial_ask
-                sell_profit = initial_bid - ticks[tick_index][2]
+                tick_index = tick_start
+                tick_start = tick_start - 1
+
+                initial_bid = ticks[tick_index][1]
+                initial_ask = ticks[tick_index][2]
                 tick_index = tick_index + 1
 
-                if buy_profit < (-1 * pips):
-                    shouldBuy = False
+                shouldBuy = True
+                shouldSell = True
+                buyWins = False
+                sellWins = False
 
-                if sell_profit < (-1 * pips):
-                    shouldSell = False
+                while tick_index < len(ticks):
+                    buy_profit = ticks[tick_index][1] - initial_ask
+                    sell_profit = initial_bid - ticks[tick_index][2]
+                    tick_index = tick_index + 1
 
-                if not shouldBuy and not shouldSell:
-                    break
+                    if buy_profit < (-1 * pips):
+                        shouldBuy = False
 
-                if shouldBuy and buy_profit > pips:
-                    buyWins = True
-                    break
+                    if sell_profit < (-1 * pips):
+                        shouldSell = False
 
-                if shouldSell and sell_profit > pips:
-                    sellWins = True
-                    break
+                    if not shouldBuy and not shouldSell:
+                        break
 
-            if buyWins:
-                label = 1
-            elif sellWins:
-                label = -1
-            else:
-                label = 0
+                    if shouldBuy and buy_profit > pips:
+                        buyWins = True
+                        break
 
-            cursor5.execute("""
-            INSERT INTO labels (pips, fx_datetime, label)
-            VALUES (%s, %s, %s)
-            """, (pips, minute[0], label,))
+                    if shouldSell and sell_profit > pips:
+                        sellWins = True
+                        break
 
-            count = count + 1
+                if buyWins:
+                    label = 1
+                elif sellWins:
+                    label = -1
+                else:
+                    label = 0
 
-        conn.commit()
+                cursor5.execute("""
+                INSERT INTO labels (pips, fx_datetime, label)
+                VALUES (%s, %s, %s)
+                """, (pips, minute[0], label,))
 
-    total_count = total_count + count
-    print(f"start_time: {week[0]}, end_time: {week[1]}, count: {count}, total_count: {total_count}")
+                count = count + 1
+
+            conn.commit()
+
+        total_count = total_count + count
+        print(f"pips: {pips}, start_time: {week[0]}, end_time: {week[1]}, count: {count}, total_count: {total_count}")
