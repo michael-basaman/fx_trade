@@ -67,7 +67,7 @@ def main():
     # normalize_array(x_test)
     # print(f"normalized {len(data)} hours in {time.time() - start_time} seconds")
 
-    checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/checkpoints/{run_time.strftime('%Y%m%d_%H%M%S')}.weights.h5"
+    checkpoint_path = f"C:/VirtualBox/fx_trade/checkpoints/{run_time.strftime('%Y%m%d_%H%M%S')}.weights.h5"
     # checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # Create a callback that saves the model's weights
@@ -98,7 +98,7 @@ def main():
 
     print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-    model.save(f"C:/VirtualBox/sourcetree/fx_trade/models/{run_time.strftime('%Y%m%d_%H%M%S')}.keras")
+    model.save(f"C:/VirtualBox/fx_trade/models/{run_time.strftime('%Y%m%d_%H%M%S')}.keras")
 
     print("finished")
 
