@@ -1,3 +1,6 @@
 load_db/.idea/load_db.iml
 load_db/.idea/modules.xml
 load_db/.idea/inspectionProfiles/profiles_settings.xml
+predict/.idea/modules.xml
+predict/.idea/predict.iml
+predict/.idea/inspectionProfiles/profiles_settings.xml
