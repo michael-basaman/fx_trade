@@ -82,7 +82,7 @@ def main():
 
     model.fit(x_train, y_train,
               epochs=EPOCHS,
-              class_weight=class_weight,
+              # class_weight=class_weight,
               callbacks=[early_stopping, cp_callback])
 
     print(f"fit {len(x_train)} windows in {time.time() - start_time} seconds")
@@ -128,25 +128,27 @@ def load_data():
     data_minutes = []
     labels = []
 
+    timeseries_length = 50 - 1
+
     for session in sessions:
         cursor2.execute("""
         SELECT m.fx_datetime, m.sma_26, m.sma_50, m.sma_200, m.macd, l.label
         FROM minutes m, labels l
         WHERE m.fx_datetime >= %s
         AND m.fx_datetime < %s
-        AND l.pips = 2000
+        AND l.pips = 1000
         AND l.fx_datetime = m.fx_datetime
         ORDER BY m.fx_datetime
         """, (session[0], session[1],))
 
         minutes = cursor2.fetchall()
 
-        minute_index = 25
+        minute_index = timeseries_length
 
         while minute_index < len(minutes):
             window_minutes = []
 
-            for element_index in range(minute_index - 25, minute_index + 1):
+            for element_index in range(minute_index - timeseries_length, minute_index + 1):
                 window_minutes.append(np.array([minutes[element_index][1],
                                             minutes[element_index][2],
                                             minutes[element_index][3],
@@ -195,17 +197,25 @@ def load_data():
 
 def get_model():
     model = tf.keras.models.Sequential([
-        tf.keras.layers.LSTM(512, return_sequences=True),
-        tf.keras.layers.Dropout(0.2),
-        #tf.keras.layers.BatchNormalization(),
-
+        tf.keras.layers.LSTM(256, return_sequences=True),
         tf.keras.layers.LSTM(128, return_sequences=True),
-        tf.keras.layers.Dropout(0.2),
-
-        tf.keras.layers.LSTM(64),
-        tf.keras.layers.Dropout(0.2),
-
+        #tf.keras.layers.LSTM(128, return_sequences=True),
         tf.keras.layers.Flatten(),
+
+        # Add a hidden layer with dropout
+        tf.keras.layers.Dense(128, activation="relu"),
+        tf.keras.layers.Dropout(0.2),
+
+        # tf.keras.layers.Dropout(0.2),
+        # #tf.keras.layers.BatchNormalization(),
+        #
+        # tf.keras.layers.LSTM(128, return_sequences=True),
+        # tf.keras.layers.Dropout(0.2),
+        #
+        # tf.keras.layers.LSTM(32),
+        # tf.keras.layers.Dropout(0.2),
+        # #
+        # tf.keras.layers.Flatten(),
 
         tf.keras.layers.Dense(3, activation="softmax")
     ])
