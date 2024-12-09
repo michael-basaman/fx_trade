@@ -45,7 +45,7 @@ def normalize_array(x_array):
 
 
 def main():
-    run_time = datetime.now()
+    run_time = datetime.datetime.now()
 
     start_time = time.time()
 
@@ -67,10 +67,7 @@ def main():
     # normalize_array(x_test)
     # print(f"normalized {len(data)} hours in {time.time() - start_time} seconds")
 
-    with open("C:/VirtualBox/pyworkspace/trade/train.txt", "a") as file_output:
-        file_output.write(f"*** starting training at {datetime.datetime.now()} ***\n")
-
-    checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/checkpoints/{run_time.strftime('%Y%m%d_%H%M%S')}.ckpt"
+    checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/checkpoints/{run_time.strftime('%Y%m%d_%H%M%S')}.weights.h5"
     # checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # Create a callback that saves the model's weights
