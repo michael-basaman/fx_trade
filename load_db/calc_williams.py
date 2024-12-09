@@ -148,6 +148,8 @@ for week_minutes in all_minutes:
         else:
             week_minutes[week_index].append(-50.0)
 
+        week_index = week_index + 1
+
 elapsed_time = time.time() - start_time
 print(f"elapsed_time: {elapsed_time}")
 
