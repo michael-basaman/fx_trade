@@ -132,7 +132,7 @@ def load_data():
 
     for session in sessions:
         cursor2.execute("""
-        SELECT m.fx_datetime, m.sma_26, m.sma_50, m.sma_200, m.macd, l.label
+        SELECT m.fx_datetime, m.sma_26, m.sma_50, m.sma_200, m.macd, m.rsi, m.williams, l.label
         FROM minutes m, labels l
         WHERE m.fx_datetime >= %s
         AND m.fx_datetime < %s
@@ -150,13 +150,15 @@ def load_data():
 
             for element_index in range(minute_index - timeseries_length, minute_index + 1):
                 window_minutes.append(np.array([minutes[element_index][1],
-                                            minutes[element_index][2],
-                                            minutes[element_index][3],
-                                            minutes[element_index][4],
+                                                minutes[element_index][2],
+                                                minutes[element_index][3],
+                                                minutes[element_index][4],
+                                                minutes[element_index][5],
+                                                minutes[element_index][6],
                                             ], dtype=np.float32))
 
             data_minutes.append(np.array(window_minutes, dtype=np.float32))
-            labels.append(minutes[minute_index][5] + 1) # TODO: fix label data to start with 0
+            labels.append(minutes[minute_index][7] + 1) # TODO: fix label data to start with 0
             minute_index = minute_index + 1
 
         memory_info = process.memory_info()
@@ -197,6 +199,7 @@ def load_data():
 
 def get_model():
     model = tf.keras.models.Sequential([
+        tf.keras.layers.LSTM(512, return_sequences=True),
         tf.keras.layers.LSTM(256, return_sequences=True),
         tf.keras.layers.LSTM(128, return_sequences=True),
         #tf.keras.layers.LSTM(128, return_sequences=True),
