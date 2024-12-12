@@ -5,6 +5,7 @@ import psutil
 import psycopg2
 import math
 import datetime
+import random
 
 # import random
 # import json
@@ -55,8 +56,11 @@ def main():
 
     start_time = time.time()
 
+    seed = random.randint(0, 2 ** 32 - 1)
+    seed = 1971504492
+
     x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=TEST_SIZE
+        data, labels, test_size=TEST_SIZE, random_state=seed
     )
 
     print(f"split {len(data)} windows in {time.time() - start_time} seconds")
@@ -67,7 +71,7 @@ def main():
     # normalize_array(x_test)
     # print(f"normalized {len(data)} hours in {time.time() - start_time} seconds")
 
-    checkpoint_path = f"C:/VirtualBox/fx_trade/checkpoints/{run_time.strftime('%Y%m%d_%H%M%S')}.weights.h5"
+    checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/predict/checkpoints/1_{seed}.weights.h5"
     # checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # Create a callback that saves the model's weights
@@ -98,7 +102,7 @@ def main():
 
     print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-    model.save(f"C:/VirtualBox/fx_trade/models/{run_time.strftime('%Y%m%d_%H%M%S')}.keras")
+    model.save(f"C:/VirtualBox/sourcetree/fx_trade/predict/models/1_{seed}.keras")
 
     print("finished")
 
