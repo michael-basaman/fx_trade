@@ -4,15 +4,8 @@ import time
 import psutil
 import psycopg2
 import math
-import datetime
-import random
-
+import os
 # import random
-# import json
-# import gc
-# import io
-# import os
-# from contextlib import redirect_stdout
 
 from sklearn.model_selection import train_test_split
 
@@ -20,59 +13,27 @@ EPOCHS = 500
 TEST_SIZE = 0.4
 
 
-def normalize_array(x_array):
-    input_size = None
-    if len(x_array) > 0:
-        if len(x_array[0]) > 0:
-            input_size = len(x_array[0][0])
-    if input_size is None:
-        return
-
-    for input_i in range(input_size):
-        for window_i in range(len(x_array)):
-            value_sum = 0
-            for minute_i in range(len(x_array[window_i])):
-                value_sum = value_sum + x_array[window_i][minute_i][input_i]
-            average = value_sum / len(x_array[window_i])
-
-            variance_sum = 0
-            for minute_i in range(len(x_array[window_i])):
-                variance_sum = variance_sum + ((average - x_array[window_i][minute_i][input_i]) ** 2.0)
-            variance = variance_sum / len(x_array[window_i])
-            stddev = math.sqrt(variance)
-
-            for minute_i in range(len(x_array[window_i])):
-                x_array[window_i][minute_i][input_i] = (x_array[window_i][minute_i][input_i] - average) / stddev
-
-
 def main():
-    run_time = datetime.datetime.now()
+    # run_time = datetime.datetime.now()
 
     start_time = time.time()
 
     data, labels, class_weight = load_data()
 
-    print(f"loaded {len(data)} sequences in {time.time() - start_time} seconds")
-
+    print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    seed = random.randint(0, 2 ** 32 - 1)
+    # seed = random.randint(0, 2 ** 32 - 1)
     seed = 1971504492
 
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=TEST_SIZE, random_state=seed
     )
 
-    print(f"split {len(data)} windows in {time.time() - start_time} seconds")
-
-    # database already normalized
-    #
-    # normalize_array(x_train)
-    # normalize_array(x_test)
-    # print(f"normalized {len(data)} hours in {time.time() - start_time} seconds")
+    print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
+    start_time = time.time()
 
     checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/predict/checkpoints/1_{seed}.weights.h5"
-    # checkpoint_dir = os.path.dirname(checkpoint_path)
 
     # Create a callback that saves the model's weights
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
@@ -80,23 +41,22 @@ def main():
                                                      verbose=1)
     model = get_model()
 
-    start_time = time.time()
+    if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
+        print(f"loading weights from checkpoint: {checkpoint_path}")
+        model.load_weights(checkpoint_path)
 
     early_stopping = tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=50)
+
+    print(f"created model in {format_seconds(time.time() - start_time)}")
+    start_time = time.time()
 
     model.fit(x_train, y_train,
               epochs=EPOCHS,
               # class_weight=class_weight,
               callbacks=[early_stopping, cp_callback])
 
-    print(f"fit {len(x_train)} windows in {time.time() - start_time} seconds")
-
-    # result = model.predict(x_test)
-    # print(result)
-    #
-    # if len(result) != len(y_test):
-    #     print(f"invalid results size - result: {len(result)}, y_train: {len(y_test)}")
-    #     exit()
+    print(f"trained model in {format_seconds(time.time() - start_time)}")
+    start_time = time.time()
 
     loss, accuracy = model.evaluate(x_test, y_test, verbose=0)
 
@@ -104,7 +64,7 @@ def main():
 
     model.save(f"C:/VirtualBox/sourcetree/fx_trade/predict/models/1_{seed}.keras")
 
-    print("finished")
+    print(f"finished in {format_seconds(time.time() - start_time)}")
 
 
 def load_data():
@@ -114,8 +74,6 @@ def load_data():
 
     cursor = conn.cursor()
     cursor2 = conn.cursor()
-
-    start_time = time.time()
 
     cursor.execute("""
     SELECT start_time, end_time
@@ -167,9 +125,7 @@ def load_data():
 
         memory_info = process.memory_info()
         array_memory = memory_info.rss - initial_memory
-        print(session[0], len(labels), array_memory, array_memory / len(labels))
-
-    elapsed1 = time.time() - start_time
+        print(f"start_date: {session[0]}, count: {len(labels)}, memory: {array_memory:,}")
 
     d_count = {}
     for label in labels:
@@ -191,13 +147,6 @@ def load_data():
 
         class_weight[count_label] = weight
 
-    print(f"class_weights: {class_weight}")
-
-    memory_info = process.memory_info()
-    total_memory = memory_info.rss
-
-    print("data loaded", len(data_minutes), elapsed1, total_memory)
-
     return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
@@ -206,23 +155,10 @@ def get_model():
         tf.keras.layers.LSTM(512, return_sequences=True),
         tf.keras.layers.LSTM(256, return_sequences=True),
         tf.keras.layers.LSTM(128, return_sequences=True),
-        #tf.keras.layers.LSTM(128, return_sequences=True),
         tf.keras.layers.Flatten(),
 
-        # Add a hidden layer with dropout
         tf.keras.layers.Dense(128, activation="relu"),
         tf.keras.layers.Dropout(0.2),
-
-        # tf.keras.layers.Dropout(0.2),
-        # #tf.keras.layers.BatchNormalization(),
-        #
-        # tf.keras.layers.LSTM(128, return_sequences=True),
-        # tf.keras.layers.Dropout(0.2),
-        #
-        # tf.keras.layers.LSTM(32),
-        # tf.keras.layers.Dropout(0.2),
-        # #
-        # tf.keras.layers.Flatten(),
 
         tf.keras.layers.Dense(3, activation="softmax")
     ])
@@ -234,6 +170,43 @@ def get_model():
     )
 
     return model
+
+
+def format_seconds(seconds):
+    hours = int(math.floor(seconds / 3600))
+    seconds -= hours * 3600
+
+    minutes = int(math.floor(seconds / 60))
+    seconds -= minutes * 60
+
+    seconds = math.floor(seconds)
+
+    return '{:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+
+
+# def normalize_array(x_array):
+#     input_size = None
+#     if len(x_array) > 0:
+#         if len(x_array[0]) > 0:
+#             input_size = len(x_array[0][0])
+#     if input_size is None:
+#         return
+#
+#     for input_i in range(input_size):
+#         for window_i in range(len(x_array)):
+#             value_sum = 0
+#             for minute_i in range(len(x_array[window_i])):
+#                 value_sum = value_sum + x_array[window_i][minute_i][input_i]
+#             average = value_sum / len(x_array[window_i])
+#
+#             variance_sum = 0
+#             for minute_i in range(len(x_array[window_i])):
+#                 variance_sum = variance_sum + ((average - x_array[window_i][minute_i][input_i]) ** 2.0)
+#             variance = variance_sum / len(x_array[window_i])
+#             stddev = math.sqrt(variance)
+#
+#             for minute_i in range(len(x_array[window_i])):
+#                 x_array[window_i][minute_i][input_i] = (x_array[window_i][minute_i][input_i] - average) / stddev
 
 
 if __name__ == "__main__":
