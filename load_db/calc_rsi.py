@@ -148,8 +148,6 @@ for week_minutes in all_minutes:
     avg_gain = sum_gain / 14.0
     avg_loss = sum_loss / 14.0
 
-
-
     if (avg_gain + avg_loss) == 0:
         week_minutes[week_index].append(50.0)
     else:
