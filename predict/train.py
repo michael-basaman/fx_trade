@@ -14,11 +14,12 @@ TEST_SIZE = 0.4
 
 
 def main():
-    # run_time = datetime.datetime.now()
+    model_number = 2
+    do_training = True
 
     start_time = time.time()
 
-    data, labels, class_weight = load_data()
+    data, labels, class_weight = load_data(model_number)
 
     print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
@@ -33,7 +34,7 @@ def main():
     print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    checkpoint_path = f"C:/VirtualBox/sourcetree/fx_trade/predict/checkpoints/1_{seed}.weights.h5"
+    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{model_number}_{seed}.weights.h5"
 
     # Create a callback that saves the model's weights
     cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
@@ -50,10 +51,11 @@ def main():
     print(f"created model in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    model.fit(x_train, y_train,
-              epochs=EPOCHS,
-              # class_weight=class_weight,
-              callbacks=[early_stopping, cp_callback])
+    if do_training:
+        model.fit(x_train, y_train,
+                  epochs=EPOCHS,
+                  # class_weight=class_weight,
+                  callbacks=[early_stopping, cp_callback])
 
     print(f"trained model in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
@@ -62,12 +64,12 @@ def main():
 
     print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-    model.save(f"C:/VirtualBox/sourcetree/fx_trade/predict/models/1_{seed}.keras")
+    model.save(f"C:/VirtualBox/rsync/fx_trade/models/{model_number}_{seed}.keras")
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
 
-def load_data():
+def load_data(model_number):
     process = psutil.Process()
 
     conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
@@ -90,7 +92,17 @@ def load_data():
     data_minutes = []
     labels = []
 
-    timeseries_length = 50 - 1
+    if model_number == 1:
+        timeseries_length = 50
+        skip_length = 1
+    elif model_number == 2:
+        timeseries_length = 30
+        skip_length = 30
+    else:
+        print(f"model_number {model_number} not defined")
+        exit(1)
+
+    timeseries_length = timeseries_length - 1
 
     for session in sessions:
         cursor2.execute("""
@@ -121,7 +133,7 @@ def load_data():
 
             data_minutes.append(np.array(window_minutes, dtype=np.float32))
             labels.append(minutes[minute_index][7] + 1) # TODO: fix label data to start with 0
-            minute_index = minute_index + 1
+            minute_index = minute_index + skip_length
 
         memory_info = process.memory_info()
         array_memory = memory_info.rss - initial_memory
