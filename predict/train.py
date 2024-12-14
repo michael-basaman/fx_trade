@@ -50,33 +50,6 @@ def main():
     start_time = time.time()
 
     if do_training:
-        # if manual_save:
-        #     max_accuracy = 0
-        #     no_improvement_count = 0
-        #
-        #     epoch_number = 0
-        #     while True:
-        #         epoch_number = epoch_number + 1
-        #
-        #         model.fit(x_train, y_train,
-        #                   epochs=1)
-        #
-        #         loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
-        #
-        #         if accuracy > max_accuracy:
-        #             print(f"Epoch {epoch_number}: accuracy improved from {max_accuracy:.6f} to {accuracy:.6f}, saving model to {checkpoint_path}")
-        #             max_accuracy = accuracy
-        #             model.save(checkpoint_path)
-        #         else:
-        #             print(f"Epoch {epoch_number}: accuracy did not improve from {max_accuracy:.6f}")
-        #             no_improvement_count + no_improvement_count + 1
-        #
-        #             if no_improvement_count >= patience:
-        #                 print(f"did not improve for {no_improvement_count} epochs, stopping")
-        #                 break
-        #
-        #
-        # else:
         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                          monitor='val_accuracy',
                                                          mode='max',
