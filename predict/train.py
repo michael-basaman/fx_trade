@@ -5,17 +5,21 @@ import psutil
 import psycopg2
 import math
 import os
+import shutil
+import datetime
 # import random
 
 from sklearn.model_selection import train_test_split
 
-EPOCHS = 500
-TEST_SIZE = 0.4
+EPOCHS = 5000
+TEST_SIZE = 0.2
 
 
 def main():
-    model_number = 2
+    model_number = 4
     do_training = True
+    manual_save = True
+    patience = 50
 
     start_time = time.time()
 
@@ -34,37 +38,75 @@ def main():
     print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{model_number}_{seed}.weights.h5"
-
-    # Create a callback that saves the model's weights
-    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                     save_weights_only=True,
-                                                     verbose=1)
-    model = get_model()
+    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{model_number}_{seed}.model.keras"
 
     if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
-        print(f"loading weights from checkpoint: {checkpoint_path}")
-        model.load_weights(checkpoint_path)
-
-    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='accuracy', patience=50)
+        print(f"loading model from checkpoint: {checkpoint_path}")
+        model = tf.keras.models.load_model(checkpoint_path)
+    else:
+        model = get_model(model_number)
 
     print(f"created model in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
     if do_training:
+        # if manual_save:
+        #     max_accuracy = 0
+        #     no_improvement_count = 0
+        #
+        #     epoch_number = 0
+        #     while True:
+        #         epoch_number = epoch_number + 1
+        #
+        #         model.fit(x_train, y_train,
+        #                   epochs=1)
+        #
+        #         loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+        #
+        #         if accuracy > max_accuracy:
+        #             print(f"Epoch {epoch_number}: accuracy improved from {max_accuracy:.6f} to {accuracy:.6f}, saving model to {checkpoint_path}")
+        #             max_accuracy = accuracy
+        #             model.save(checkpoint_path)
+        #         else:
+        #             print(f"Epoch {epoch_number}: accuracy did not improve from {max_accuracy:.6f}")
+        #             no_improvement_count + no_improvement_count + 1
+        #
+        #             if no_improvement_count >= patience:
+        #                 print(f"did not improve for {no_improvement_count} epochs, stopping")
+        #                 break
+        #
+        #
+        # else:
+        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                         monitor='val_accuracy',
+                                                         mode='max',
+                                                         save_best_only=True,
+                                                         save_weights_only=False,
+                                                         verbose=1)
+
+        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
+                                                          mode='max',
+                                                          patience=patience,
+                                                          verbose=1)
+
         model.fit(x_train, y_train,
                   epochs=EPOCHS,
-                  # class_weight=class_weight,
-                  callbacks=[early_stopping, cp_callback])
+                  callbacks=[early_stopping, cp_callback],
+                  validation_data=(x_test, y_test))
 
     print(f"trained model in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    loss, accuracy = model.evaluate(x_test, y_test, verbose=0)
+    loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
 
     print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-    model.save(f"C:/VirtualBox/rsync/fx_trade/models/{model_number}_{seed}.keras")
+    if do_training:
+        now = datetime.now()
+
+        model_path = f"C:/VirtualBox/rsync/fx_trade/models/{model_number}_{seed}_{now.strftime("%Y%m%d_%H%M%S")}.model.keras"
+
+        shutil.move(checkpoint_path, model_path)
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
@@ -92,14 +134,14 @@ def load_data(model_number):
     data_minutes = []
     labels = []
 
-    if model_number == 1:
+    if model_number in {1}:
         timeseries_length = 50
         skip_length = 1
-    elif model_number == 2:
+    elif model_number in {2, 3, 4}:
         timeseries_length = 30
         skip_length = 30
     else:
-        print(f"model_number {model_number} not defined")
+        print(f"load_data() model_number {model_number} not defined")
         exit(1)
 
     timeseries_length = timeseries_length - 1
@@ -162,18 +204,35 @@ def load_data(model_number):
     return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
-def get_model():
-    model = tf.keras.models.Sequential([
-        tf.keras.layers.LSTM(512, return_sequences=True),
-        tf.keras.layers.LSTM(256, return_sequences=True),
-        tf.keras.layers.LSTM(128, return_sequences=True),
-        tf.keras.layers.Flatten(),
+def get_model(model_number):
 
-        tf.keras.layers.Dense(128, activation="relu"),
-        tf.keras.layers.Dropout(0.2),
+    if model_number in {1, 2, 4}:
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.LSTM(512, return_sequences=True),
+            tf.keras.layers.LSTM(256, return_sequences=True),
+            tf.keras.layers.LSTM(128, return_sequences=True),
+            tf.keras.layers.Flatten(),
 
-        tf.keras.layers.Dense(3, activation="softmax")
-    ])
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dropout(0.2),
+
+            tf.keras.layers.Dense(3, activation="softmax")
+        ])
+    elif model_number in {3}:
+        model = tf.keras.models.Sequential([
+            tf.keras.layers.LSTM(512, dropout=0.2, return_sequences=True),
+            tf.keras.layers.LSTM(256, dropout=0.2, return_sequences=True),
+            tf.keras.layers.LSTM(128, dropout=0.2, return_sequences=True),
+            tf.keras.layers.Flatten(),
+
+            tf.keras.layers.Dense(128, activation="relu"),
+            tf.keras.layers.Dropout(0.2),
+
+            tf.keras.layers.Dense(3, activation="softmax")
+        ])
+    else:
+        print(f"get_model() model_number {model_number} not defined")
+        exit(1)
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
@@ -185,6 +244,9 @@ def get_model():
 
 
 def format_seconds(seconds):
+    days = int(math.floor(seconds / 86400))
+    seconds -= days * 86400
+
     hours = int(math.floor(seconds / 3600))
     seconds -= hours * 3600
 
@@ -193,7 +255,12 @@ def format_seconds(seconds):
 
     seconds = math.floor(seconds)
 
-    return '{:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+    if days == 0:
+        return '{:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+    elif days == 1:
+        return '1 day, {:02d}:{:02d}:{:02d}'.format(hours, minutes, seconds)
+    else:
+        return '{} days, {:02d}:{:02d}:{:02d}'.format(days, hours, minutes, seconds)
 
 
 # def normalize_array(x_array):
