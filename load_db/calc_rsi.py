@@ -237,6 +237,10 @@ if stddev == 0:
 elapsed_time = time.time() - start_time
 print(f"elapsed_time: {elapsed_time}")
 
+cursor5.execute("INSERT INTO indicators (name, average, stddev) VALUES (%s, %s, %s)",
+                    (f"rsi", average_rsi, stddev,))
+conn.commit()
+
 update_count = 0
 for week_minutes in all_minutes:
     for minute in week_minutes:

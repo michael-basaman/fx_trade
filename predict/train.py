@@ -7,7 +7,7 @@ import math
 import os
 import shutil
 import datetime
-# import random
+#import random
 
 from sklearn.model_selection import train_test_split
 
@@ -16,10 +16,13 @@ TEST_SIZE = 0.2
 
 
 def main():
-    model_number = 4
+    now = datetime.datetime.now()
+    now_str = now.strftime("%Y%m%d%H%M%S")
+
+    model_number = 3
     do_training = True
     manual_save = True
-    patience = 50
+    patience = 25
 
     start_time = time.time()
 
@@ -28,58 +31,60 @@ def main():
     print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    # seed = random.randint(0, 2 ** 32 - 1)
-    seed = 1971504492
+    #seed = random.randint(0, 2 ** 32 - 1)
+    #seed = 1971504492
 
     x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=TEST_SIZE, random_state=seed
+        data, labels, test_size=TEST_SIZE
     )
 
     print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
 
-    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{model_number}_{seed}.model.keras"
+    for layer_count in range(1, 5):
+        for base_units in [32, 64, 128, 256]:
+            start_time = time.time()
 
-    if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
-        print(f"loading model from checkpoint: {checkpoint_path}")
-        model = tf.keras.models.load_model(checkpoint_path)
-    else:
-        model = get_model(model_number)
+            checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_{layer_count}_{base_units}.model.keras"
 
-    print(f"created model in {format_seconds(time.time() - start_time)}")
-    start_time = time.time()
+            # if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
+            #     print(f"loading model from checkpoint: {checkpoint_path}")
+            #     model = tf.keras.models.load_model(checkpoint_path)
+            # else:
 
-    if do_training:
-        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                         monitor='val_accuracy',
-                                                         mode='max',
-                                                         save_best_only=True,
-                                                         save_weights_only=False,
-                                                         verbose=1)
+            tf.keras.backend.clear_session()
+            model = get_model(layer_count, base_units)
 
-        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
-                                                          mode='max',
-                                                          patience=patience,
-                                                          verbose=1)
+            cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                             monitor='val_accuracy',
+                                                             mode='max',
+                                                             save_best_only=True,
+                                                             save_weights_only=False,
+                                                             verbose=1)
 
-        model.fit(x_train, y_train,
-                  epochs=EPOCHS,
-                  callbacks=[early_stopping, cp_callback],
-                  validation_data=(x_test, y_test))
+            early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
+                                                              mode='max',
+                                                              patience=patience,
+                                                              verbose=1)
 
-    print(f"trained model in {format_seconds(time.time() - start_time)}")
-    start_time = time.time()
+            model.fit(x_train, y_train,
+                      epochs=EPOCHS,
+                      callbacks=[early_stopping, cp_callback],
+                      validation_data=(x_test, y_test))
 
-    loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+            print(f"trained model in {format_seconds(time.time() - start_time)}")
+            start_time = time.time()
 
-    print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
+            if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
+                tf.keras.backend.clear_session()
+                model = tf.keras.models.load_model(checkpoint_path)
 
-    if do_training:
-        now = datetime.now()
+            loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
 
-        model_path = f"C:/VirtualBox/rsync/fx_trade/models/{model_number}_{seed}_{now.strftime("%Y%m%d_%H%M%S")}.model.keras"
+            print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-        shutil.move(checkpoint_path, model_path)
+            model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_{int(100000 * accuracy)}_{layer_count}_{base_units}.model.keras"
+            shutil.move(checkpoint_path, model_path)
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
@@ -177,35 +182,46 @@ def load_data(model_number):
     return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
-def get_model(model_number):
-
-    if model_number in {1, 2, 4}:
-        model = tf.keras.models.Sequential([
-            tf.keras.layers.LSTM(512, return_sequences=True),
-            tf.keras.layers.LSTM(256, return_sequences=True),
-            tf.keras.layers.LSTM(128, return_sequences=True),
-            tf.keras.layers.Flatten(),
-
-            tf.keras.layers.Dense(128, activation="relu"),
-            tf.keras.layers.Dropout(0.2),
-
-            tf.keras.layers.Dense(3, activation="softmax")
-        ])
-    elif model_number in {3}:
-        model = tf.keras.models.Sequential([
-            tf.keras.layers.LSTM(512, dropout=0.2, return_sequences=True),
-            tf.keras.layers.LSTM(256, dropout=0.2, return_sequences=True),
-            tf.keras.layers.LSTM(128, dropout=0.2, return_sequences=True),
-            tf.keras.layers.Flatten(),
-
-            tf.keras.layers.Dense(128, activation="relu"),
-            tf.keras.layers.Dropout(0.2),
-
-            tf.keras.layers.Dense(3, activation="softmax")
-        ])
-    else:
-        print(f"get_model() model_number {model_number} not defined")
+def get_model(layer_count, base_units):
+    if layer_count <= 0:
+        print(f"invalid layer_count: {layer_count}")
         exit(1)
+
+    model = tf.keras.models.Sequential()
+    print(f"creating model - layer_count: {layer_count}, base_units: {base_units}")
+    print(f"\ttf.keras.models.Sequential([")
+
+    for label_index in range(0, layer_count):
+        layer_power = layer_count - label_index - 1
+        layer_multiple = 1
+        for i in range(layer_power):
+            layer_multiple = layer_multiple * 2
+        layer_units = base_units * layer_multiple
+
+        if layer_power > 0:
+            return_sequences = True
+        else:
+            return_sequences = False
+
+        model.add(tf.keras.layers.LSTM(layer_units, dropout=0.2, recurrent_dropout=0.1, return_sequences=return_sequences))
+        print(f"\t\ttf.keras.layers.LSTM({layer_units}, dropout=0.2, recurrent_dropout=0.1, return_sequences={return_sequences}),")
+
+    model.add(tf.keras.layers.Dense(3, activation="softmax"))
+    print(f'\t\ttf.keras.layers.Dense(3, activation="softmax")')
+    print(f"\t])")
+
+
+    # model = tf.keras.models.Sequential([
+    #     tf.keras.layers.LSTM(512, return_sequences=True),
+    #     tf.keras.layers.LSTM(256, return_sequences=True),
+    #     tf.keras.layers.LSTM(128, return_sequences=True),
+    #     tf.keras.layers.Flatten(),
+    #
+    #     tf.keras.layers.Dense(128, activation="relu"),
+    #     tf.keras.layers.Dropout(0.2),
+    #
+    #     tf.keras.layers.Dense(3, activation="softmax")
+    # ])
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
