@@ -31,11 +31,6 @@ for pips_i in range(5, 6):
 
     pips = pips_i * 100
 
-    buy_count = 0
-    neutral_count = 0
-    sell_count = 0
-    outcomes = []
-
     for week in weeks:
         count = 0
 
@@ -83,7 +78,7 @@ for pips_i in range(5, 6):
                 #     found_minute = True
 
                 while tick_start < len(ticks):
-                    if ticks[tick_start][0] < minute[0]:
+                    if ticks[tick_start][0] < (minute[0] + datetime.timedelta(minutes=1)):
                         tick_start = tick_start + 1
                         # if found_minute:
                         #     print(f"not yet {ticks[tick_start][0].strftime("%Y-%m-%d %H:%M:%S")}, tick_start: {tick_start}")
@@ -183,54 +178,9 @@ for pips_i in range(5, 6):
                 VALUES (%s, %s, %s, %s)
                 """, (pips, minute[0], label, outcome_seconds,))
 
-                if session[2]:
-                    if buyWins:
-                        buy_count = buy_count + 1
-                    elif sellWins:
-                        sell_count = sell_count + 1
-                    else:
-                        neutral_count = neutral_count + 1
-
-                    if outcome_seconds > 0:
-                        outcomes.append(outcome_seconds)
-
                 count = count + 1
 
             conn.commit()
 
         total_count = total_count + count
         print(f"pips: {pips}, start_time: {week[0]}, end_time: {week[1]}, count: {count}, total_count: {total_count}")
-
-    outcome_count = buy_count + sell_count + neutral_count
-
-    if outcome_count > 0:
-        buy_rate = buy_count / outcome_count
-        sell_rate = sell_count / outcome_count
-        neutral_rate = neutral_count / outcome_count
-    else:
-        buy_rate = 0
-        sell_rate = 0
-        neutral_rate = 0
-
-    if len(outcomes) > 0:
-        sum_outcome_seconds = 0
-        for outcome_seconds in outcomes:
-            sum_outcome_seconds = sum_outcome_seconds + outcome_seconds
-        avg_outcome_seconds = sum_outcome_seconds / len(outcomes)
-
-        sum_variance = 0
-        for outcome_seconds in outcomes:
-            sum_variance = sum_variance + ((avg_outcome_seconds - outcome_seconds) ** 2)
-        variance = sum_variance / len(outcomes)
-        stddev = math.sqrt(variance)
-    else:
-        avg_outcome_seconds = 0
-        stddev = 0
-
-    cursor5.execute("""
-    INSERT INTO outcomes (pips, average_seconds, stddev_seconds, buy_rate, neutral_rate, sell_rate)
-    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-    """, (pips, avg_outcome_seconds, stddev, buy_rate, neutral_rate, sell_rate,))
-    conn.commit()
-
-
