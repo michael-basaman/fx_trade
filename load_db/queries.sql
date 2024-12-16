@@ -94,3 +94,35 @@ or (EXTRACT(MONTH FROM start_time) = 12 and EXTRACT(DAY FROM start_time) = 26)
 or (EXTRACT(MONTH FROM start_time) = 12 and EXTRACT(DAY FROM start_time) = 31) -- new years eve
 )
 order by start_time;
+
+
+select avg(m.close_price - m.open_price), stddev(m.close_price - m.open_price)
+from minutes m, sessions s
+where m.fx_datetime >= s.start_time
+and m.fx_datetime < s.end_time
+and s.complete is true;
+-- 0.34379082253957710617	228.498037054401
+
+insert into normals (name, value) values ('candle_average', 0.34379082253957710617);
+insert into normals (name, value) values ('candle_stddev', 228.498037054401);
+
+select avg(m.max_price - m.min_price), stddev(m.max_price - m.min_price)
+from minutes m, sessions s
+where m.fx_datetime >= s.start_time
+and m.fx_datetime < s.end_time
+and s.complete is true;
+-- 304.4657367430532492	247.446640572918
+
+insert into normals (name, value) values ('tail_average', 304.4657367430532492);
+insert into normals (name, value) values ('tail_stddev', 247.446640572918);
+
+select avg(m.close_price - m.min_price), stddev(m.close_price - m.min_price)
+from minutes m, sessions s
+where m.fx_datetime >= s.start_time
+and m.fx_datetime < s.end_time
+and s.complete is true;
+-- 154.3566921288608436	181.362258560728
+
+insert into normals (name, value) values ('above_average', 154.3566921288608436);
+insert into normals (name, value) values ('above_stddev', 181.362258560728);
+
