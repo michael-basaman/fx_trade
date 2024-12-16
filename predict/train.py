@@ -42,47 +42,48 @@ def main():
         for base_units in [64, 128, 32, 256]:
             for recurrent_dropout_percent in [10, 0]:
                 for dropout_percent in [20, 0]:
-                    start_time = time.time()
+                    for weight_decay in [1, 0]:
+                        start_time = time.time()
 
-                    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_c{layer_count:02d}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}.model.keras"
+                        checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_c{layer_count}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay}.model.keras"
 
-                    tf.keras.backend.clear_session()
-                    model = get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent)
+                        tf.keras.backend.clear_session()
+                        model = get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent, weight_decay)
 
-                    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                                     monitor='val_loss',
-                                                                     mode='min',
-                                                                     save_best_only=True,
-                                                                     save_weights_only=False,
-                                                                     verbose=1)
+                        cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                                         monitor='val_loss',
+                                                                         mode='min',
+                                                                         save_best_only=True,
+                                                                         save_weights_only=False,
+                                                                         verbose=1)
 
-                    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                                      mode='min',
-                                                                      patience=patience,
-                                                                      restore_best_weights=True,
-                                                                      start_from_epoch=50,
-                                                                      verbose=1)
+                        early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                                          mode='min',
+                                                                          patience=patience,
+                                                                          restore_best_weights=True,
+                                                                          start_from_epoch=50,
+                                                                          verbose=1)
 
-                    model.fit(x_train, y_train,
-                              epochs=EPOCHS,
-                              callbacks=[early_stopping, cp_callback],
-                              class_weight=class_weight,
-                              batch_size=512,
-                              validation_data=(x_test, y_test))
+                        model.fit(x_train, y_train,
+                                  epochs=EPOCHS,
+                                  callbacks=[early_stopping, cp_callback],
+                                  class_weight=class_weight,
+                                  batch_size=512,
+                                  validation_data=(x_test, y_test))
 
-                    print(f"trained model in {format_seconds(time.time() - start_time)}")
-                    start_time = time.time()
+                        print(f"trained model in {format_seconds(time.time() - start_time)}")
+                        start_time = time.time()
 
-                    # if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
-                    #     tf.keras.backend.clear_session()
-                    #     model = tf.keras.models.load_model(checkpoint_path)
+                        # if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
+                        #     tf.keras.backend.clear_session()
+                        #     model = tf.keras.models.load_model(checkpoint_path)
 
-                    loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+                        loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
 
-                    print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
+                        print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-                    model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count:02d}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}.model.keras"
-                    shutil.move(checkpoint_path, model_path)
+                        model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay}.model.keras"
+                        shutil.move(checkpoint_path, model_path)
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
@@ -178,7 +179,7 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
-def get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent):
+def get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent, weight_decay):
     if layer_count <= 0:
         print(f"invalid layer_count: {layer_count}")
         exit(1)
@@ -202,7 +203,21 @@ def get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percen
         else:
             return_sequences = False
 
-        model.add(tf.keras.layers.LSTM(layer_units, dropout=dropout, recurrent_dropout=recurrent_dropout, return_sequences=return_sequences))
+        if weight_decay > 0:
+            weight_decay_fraction = weight_decay / 10000.0
+
+            model.add(tf.keras.layers.LSTM(layer_units,
+                                           dropout=dropout,
+                                           recurrent_dropout=recurrent_dropout,
+                                           return_sequences=return_sequences,
+                                           kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction),
+                                           recurrent_regularizer=tf.keras.regularizers.l2(weight_decay_fraction)))
+        else:
+            model.add(tf.keras.layers.LSTM(layer_units,
+                                           dropout=dropout,
+                                           recurrent_dropout=recurrent_dropout,
+                                           return_sequences=return_sequences))
+
         print(f"\t\ttf.keras.layers.LSTM({layer_units}, dropout=0.2, recurrent_dropout=0.1, return_sequences={return_sequences}),")
 
     model.add(tf.keras.layers.Dense(3, activation="softmax"))
