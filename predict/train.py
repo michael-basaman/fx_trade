@@ -19,77 +19,75 @@ def main():
     now = datetime.datetime.now()
     now_str = now.strftime("%Y%m%d%H%M%S")
 
-    model_number = 3
-    do_training = True
-    manual_save = True
-    patience = 25
+    timeseries_length = 30
+    skip_length = 5
+    outcome_minutes = 15
+    pips = 500
+    patience = 50
 
     start_time = time.time()
 
-    data, labels, class_weight = load_data(model_number)
+    data, labels, class_weight = load_data(timeseries_length, skip_length, outcome_minutes, pips)
 
     print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
     start_time = time.time()
-
-    #seed = random.randint(0, 2 ** 32 - 1)
-    #seed = 1971504492
 
     x_train, x_test, y_train, y_test = train_test_split(
         data, labels, test_size=TEST_SIZE
     )
 
     print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
-    start_time = time.time()
 
-    for layer_count in range(1, 5):
-        for base_units in [32, 64, 128, 256]:
-            start_time = time.time()
+    for layer_count in [3, 2, 4]:
+        for base_units in [64, 128, 32, 256]:
+            for recurrent_dropout_percent in [10, 0]:
+                for dropout_percent in [20, 0]:
+                    start_time = time.time()
 
-            checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_{layer_count}_{base_units}.model.keras"
+                    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_c{layer_count:02d}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}.model.keras"
 
-            # if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
-            #     print(f"loading model from checkpoint: {checkpoint_path}")
-            #     model = tf.keras.models.load_model(checkpoint_path)
-            # else:
+                    tf.keras.backend.clear_session()
+                    model = get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent)
 
-            tf.keras.backend.clear_session()
-            model = get_model(layer_count, base_units)
+                    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                                     monitor='val_loss',
+                                                                     mode='min',
+                                                                     save_best_only=True,
+                                                                     save_weights_only=False,
+                                                                     verbose=1)
 
-            cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                             monitor='val_accuracy',
-                                                             mode='max',
-                                                             save_best_only=True,
-                                                             save_weights_only=False,
-                                                             verbose=1)
+                    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                                      mode='min',
+                                                                      patience=patience,
+                                                                      restore_best_weights=True,
+                                                                      start_from_epoch=50,
+                                                                      verbose=1)
 
-            early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_accuracy',
-                                                              mode='max',
-                                                              patience=patience,
-                                                              verbose=1)
+                    model.fit(x_train, y_train,
+                              epochs=EPOCHS,
+                              callbacks=[early_stopping, cp_callback],
+                              class_weight=class_weight,
+                              batch_size=512,
+                              validation_data=(x_test, y_test))
 
-            model.fit(x_train, y_train,
-                      epochs=EPOCHS,
-                      callbacks=[early_stopping, cp_callback],
-                      validation_data=(x_test, y_test))
+                    print(f"trained model in {format_seconds(time.time() - start_time)}")
+                    start_time = time.time()
 
-            print(f"trained model in {format_seconds(time.time() - start_time)}")
-            start_time = time.time()
+                    # if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
+                    #     tf.keras.backend.clear_session()
+                    #     model = tf.keras.models.load_model(checkpoint_path)
 
-            if os.path.exists(checkpoint_path) and os.path.isfile(checkpoint_path):
-                tf.keras.backend.clear_session()
-                model = tf.keras.models.load_model(checkpoint_path)
+                    loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
 
-            loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+                    print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-            print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
-
-            model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_{int(100000 * accuracy)}_{layer_count}_{base_units}.model.keras"
-            shutil.move(checkpoint_path, model_path)
+                    model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count:02d}_u{base_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}.model.keras"
+                    shutil.move(checkpoint_path, model_path)
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
 
-def load_data(model_number):
+def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     process = psutil.Process()
 
     conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
@@ -112,37 +110,33 @@ def load_data(model_number):
     data_minutes = []
     labels = []
 
-    if model_number in {1}:
-        timeseries_length = 50
-        skip_length = 1
-    elif model_number in {2, 3, 4}:
-        timeseries_length = 30
-        skip_length = 30
-    else:
-        print(f"load_data() model_number {model_number} not defined")
-        exit(1)
-
-    timeseries_length = timeseries_length - 1
+    outcome_seconds = outcome_minutes * 60
 
     for session in sessions:
         cursor2.execute("""
-        SELECT m.fx_datetime, m.sma_26, m.sma_50, m.sma_200, m.macd, m.rsi, m.williams, l.label
-        FROM minutes m, labels l
+        SELECT m.fx_datetime, m.sma_15, m.sma_30, m.sma_60, m.macd, m.rsi, m.williams,
+               case when l.outcome_seconds > %s then 0
+               else l.label end outcome_label
+        FROM minutes m, labels2 l
         WHERE m.fx_datetime >= %s
         AND m.fx_datetime < %s
-        AND l.pips = 1000
+        AND l.pips = %s
         AND l.fx_datetime = m.fx_datetime
         ORDER BY m.fx_datetime
-        """, (session[0], session[1],))
+        """, (outcome_seconds, session[0], session[1], pips,))
 
         minutes = cursor2.fetchall()
 
-        minute_index = timeseries_length
+        if len(minutes) not in {600, 840}:
+            continue
+
+        timeseries_length_minus_one = timeseries_length - 1
+        minute_index = timeseries_length_minus_one
 
         while minute_index < len(minutes):
             window_minutes = []
 
-            for element_index in range(minute_index - timeseries_length, minute_index + 1):
+            for element_index in range(minute_index - timeseries_length_minus_one, minute_index + 1):
                 window_minutes.append(np.array([minutes[element_index][1],
                                                 minutes[element_index][2],
                                                 minutes[element_index][3],
@@ -152,7 +146,7 @@ def load_data(model_number):
                                             ], dtype=np.float32))
 
             data_minutes.append(np.array(window_minutes, dtype=np.float32))
-            labels.append(minutes[minute_index][7] + 1) # TODO: fix label data to start with 0
+            labels.append(minutes[minute_index][7] + 1)
             minute_index = minute_index + skip_length
 
         memory_info = process.memory_info()
@@ -179,13 +173,18 @@ def load_data(model_number):
 
         class_weight[count_label] = weight
 
+    print(f"class_weight: {class_weight}")
+
     return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
-def get_model(layer_count, base_units):
+def get_model(layer_count, base_units, dropout_percent, recurrent_dropout_percent):
     if layer_count <= 0:
         print(f"invalid layer_count: {layer_count}")
         exit(1)
+
+    dropout = dropout_percent / 100.0
+    recurrent_dropout = recurrent_dropout_percent / 100.0
 
     model = tf.keras.models.Sequential()
     print(f"creating model - layer_count: {layer_count}, base_units: {base_units}")
@@ -203,13 +202,12 @@ def get_model(layer_count, base_units):
         else:
             return_sequences = False
 
-        model.add(tf.keras.layers.LSTM(layer_units, dropout=0.2, recurrent_dropout=0.1, return_sequences=return_sequences))
+        model.add(tf.keras.layers.LSTM(layer_units, dropout=dropout, recurrent_dropout=recurrent_dropout, return_sequences=return_sequences))
         print(f"\t\ttf.keras.layers.LSTM({layer_units}, dropout=0.2, recurrent_dropout=0.1, return_sequences={return_sequences}),")
 
     model.add(tf.keras.layers.Dense(3, activation="softmax"))
     print(f'\t\ttf.keras.layers.Dense(3, activation="softmax")')
     print(f"\t])")
-
 
     # model = tf.keras.models.Sequential([
     #     tf.keras.layers.LSTM(512, return_sequences=True),
