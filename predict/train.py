@@ -244,7 +244,7 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     normals_d = {}
     cursor3.execute("SELECT name, value FROM normals")
 
-    normals = cursor2.fetchall()
+    normals = cursor3.fetchall()
 
     for normal in normals:
         normals_d[normal[0]] = normal[1]
