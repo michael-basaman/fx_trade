@@ -239,6 +239,15 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
 
     cursor = conn.cursor()
     cursor2 = conn.cursor()
+    cursor3 = conn.cursor()
+
+    normals_d = {}
+    cursor3.execute("SELECT name, value FROM normals")
+
+    normals = cursor2.fetchall()
+
+    for normal in normals:
+        normals_d[normal[0]] = normal[1]
 
     cursor.execute("""
     SELECT start_time, end_time
@@ -306,9 +315,9 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
 
             for element_index in range(minute_index - timeseries_length_minus_one, minute_index + 1):
                 window_minutes.append(np.array([(minutes[element_index][1] - avg_price) / stddev_price,
-                                                minutes[element_index][2],
-                                                minutes[element_index][3],
-                                                minutes[element_index][4],
+                                                (minutes[element_index][2] - normals_d["above_average"]) / normals_d["above_stddev"],
+                                                (minutes[element_index][3] - normals_d["candle_average"]) / normals_d["candle_stddev"],
+                                                (minutes[element_index][4] - normals_d["tail_average"]) / normals_d["tail_stddev"],
                                             ], dtype=np.float32))
 
             session_data.append(np.array(window_minutes, dtype=np.float32))
