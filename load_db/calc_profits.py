@@ -49,6 +49,7 @@ for outcome_minutes in [15]:
            WHERE start_time > %s
              AND end_time < %s
              AND complete is true
+             AND holiday is false
         ORDER BY start_time
           """, (week[0], week[1],))
 
@@ -120,7 +121,7 @@ for outcome_minutes in [15]:
                 if max_profit > -1000000:
                     profits.append(max_profit)
 
-        if week_count in [1, 10, 100, 1000, 10000]:
+        if week_count % 52 == 0:
             sum_profit = 0
             for profit in profits:
                 sum_profit = sum_profit + profit
@@ -133,10 +134,6 @@ for outcome_minutes in [15]:
 
             variance = sum_variance / len(profits)
             stddev = math.sqrt(variance)
-
-            # cursor5.execute("INSERT INTO outcomes (name, value) VALUES (%s, %s)", (f"outcome_{outcome_minutes}_average", average_profit))
-            # cursor5.execute("INSERT INTO outcomes (name, value) VALUES (%s, %s)", (f"outcome_{outcome_minutes}_stddev", stddev))
-            # conn.commit()
 
             print(f"week_count: {week_count}, outcome_minutes: {outcome_minutes}, profits: {len(profits)}, average_profit: {average_profit}, stddev: {stddev}")
 
@@ -153,11 +150,12 @@ for outcome_minutes in [15]:
     variance = sum_variance / len(profits)
     stddev = math.sqrt(variance)
 
-    cursor5.execute("INSERT INTO outcomes (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_average", average_profit))
-    cursor5.execute("INSERT INTO outcomes (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_stddev", stddev))
+    print(f"outcome_minutes: {outcome_minutes}, profits: {len(profits)}, average_profit: {average_profit}, stddev: {stddev}")
+
+    cursor5.execute("INSERT INTO normals (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_average", average_profit))
+    cursor5.execute("INSERT INTO normals (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_stddev", stddev))
     conn.commit()
 
-    print(f"outcome_minutes: {outcome_minutes}, profits: {len(profits)}, average_profit: {average_profit}, stddev: {stddev}")
 
     elapsed_time = time.time() - start_time
     print(f"elapsed_time: {elapsed_time}")

@@ -4,39 +4,51 @@ import time
 import psutil
 import psycopg2
 import math
-import os
+#import os
 import shutil
 import datetime
 #import random
 
-from sklearn.model_selection import train_test_split
+#from sklearn.model_selection import train_test_split
 
-EPOCHS = 5000
-TEST_SIZE = 0.2
+process = psutil.Process()
 
 
 def main():
     now = datetime.datetime.now()
     now_str = now.strftime("%Y%m%d%H%M%S")
 
-    timeseries_length = 15
-    skip_length = 15
+    timeseries_length = 30
+    skip_length = 1
     outcome_minutes = 15
     pips = 500
     patience = 100
 
     start_time = time.time()
 
-    data, labels, class_weight = load_data(timeseries_length, skip_length, outcome_minutes, pips)
+    # data, labels, class_weight = load_data(timeseries_length, skip_length, outcome_minutes, pips)
+    #
+    # print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
+    # start_time = time.time()
+    #
+    # x_train, x_test, y_train, y_test = train_test_split(
+    #     data, labels, test_size=TEST_SIZE
+    # )
+    #
+    # print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
 
-    print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
-    start_time = time.time()
+    memory_info = process.memory_info()
+    initial_memory = memory_info.rss
 
-    x_train, x_test, y_train, y_test = train_test_split(
-        data, labels, test_size=TEST_SIZE
-    )
+    train_data, train_labels, val_data, val_labels, test_data, test_labels, class_weight = get_data(timeseries_length, skip_length, outcome_minutes, pips)
 
-    print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
+    memory_info = process.memory_info()
+    array_memory = memory_info.rss - initial_memory
+    print(
+        f"Loaded {len(train_data) + len(val_data) + len(test_data)} minutes in {format_seconds(time.time() - start_time)}, memory: {array_memory:,}")
+
+    if patience > 0:
+        exit(1)
 
     for flatten_units in [128, 64, 0]:
         for layer_count in [3, 2]:
@@ -65,17 +77,17 @@ def main():
                                                                               start_from_epoch=patience,
                                                                               verbose=1)
 
-                            model.fit(x_train, y_train,
-                                      epochs=EPOCHS,
+                            model.fit(train_data, train_labels,
+                                      epochs=10000,
                                       callbacks=[early_stopping, cp_callback],
-                                      # class_weight=class_weight,
+                                      class_weight=class_weight,
                                       batch_size=64,
-                                      validation_data=(x_test, y_test))
+                                      validation_data=(val_data, val_labels))
 
                             print(f"trained model in {format_seconds(time.time() - start_time)}")
                             start_time = time.time()
 
-                            loss, accuracy = model.evaluate(x_test, y_test, verbose=1)
+                            loss, accuracy = model.evaluate(test_data, test_labels, verbose=1)
 
                             print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
@@ -85,9 +97,125 @@ def main():
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
 
-def load_data(timeseries_length, skip_length, outcome_minutes, pips):
-    process = psutil.Process()
+def get_data(timeseries_length, skip_length, outcome_minutes, pips):
+    memory_info = process.memory_info()
+    initial_memory = memory_info.rss
 
+    data_840, labels_840, data_600, labels_600 = load_data(timeseries_length, skip_length, outcome_minutes, pips)
+
+    d_count = {}
+    for session_labels in labels_840:
+        for label in session_labels:
+            if label not in d_count:
+                d_count[label] = 1
+            else:
+                d_count[label] = d_count[label] + 1
+
+    for session_labels in labels_600:
+        for label in session_labels:
+            if label not in d_count:
+                d_count[label] = 1
+            else:
+                d_count[label] = d_count[label] + 1
+
+    total_weights = 0
+    for count_label in d_count.keys():
+        total_weights = total_weights + d_count[count_label]
+
+    class_weight = {}
+    for count_label in [0, 1, 2]:
+        if d_count[count_label] == 0:
+            weight = 1
+        else:
+            weight = (1 / d_count[count_label]) * (total_weights / 3)
+
+        class_weight[count_label] = weight
+
+    print(f"class_weight: {class_weight}")
+
+    indices = np.random.permutation(len(data_840))
+
+    data_840 = data_840[indices]
+    labels_840 = labels_840[indices]
+
+    indices = np.random.permutation(len(data_600))
+
+    data_600 = data_600[indices]
+    labels_600 = labels_600[indices]
+
+    split_index = int(0.8 * len(data_840))
+
+    nontest_data_840 = data_840[:split_index]
+    nontest_labels_840 = labels_840[:split_index]
+    test_data_840 = data_840[split_index:]
+    test_labels_840 = labels_840[split_index:]
+
+    split_index = int(0.8 * len(data_600))
+
+    nontest_data_600 = data_600[:split_index]
+    nontest_labels_600 = labels_600[:split_index]
+    test_data_600 = data_600[split_index:]
+    test_labels_600 = labels_600[split_index:]
+
+    split_index = int(0.8 * len(nontest_data_840))
+
+    train_data_840 = nontest_data_840[:split_index]
+    train_labels_840 = nontest_labels_840[:split_index]
+    val_data_840 = nontest_data_840[split_index:]
+    val_labels_840 = nontest_labels_840[split_index:]
+
+    split_index = int(0.8 * len(nontest_data_600))
+
+    train_data_600 = nontest_data_600[:split_index]
+    train_labels_600 = nontest_labels_600[:split_index]
+    val_data_600 = nontest_data_600[split_index:]
+    val_labels_600 = nontest_labels_600[split_index:]
+
+    train_data_840 = np.reshape(train_data_840, (train_data_840.shape[0] * train_data_840.shape[1], train_data_840.shape[2]))
+    train_labels_840 = np.reshape(train_labels_840, (train_labels_840.shape[0] * train_labels_840.shape[1], train_labels_840.shape[2]))
+    val_data_840 = np.reshape(val_data_840, (val_data_840.shape[0] * val_data_840.shape[1], val_data_840.shape[2]))
+    val_labels_840 = np.reshape(val_labels_840, (val_labels_840.shape[0] * val_labels_840.shape[1], val_labels_840.shape[2]))
+    test_data_840 = np.reshape(test_data_840, (test_data_840.shape[0] * test_data_840.shape[1], test_data_840.shape[2]))
+    test_labels_840 = np.reshape(test_labels_840, (test_labels_840.shape[0] * test_labels_840.shape[1], test_labels_840.shape[2]))
+
+    train_data_600 = np.reshape(train_data_600, (train_data_600.shape[0] * train_data_600.shape[1], train_data_600.shape[2]))
+    train_labels_600 = np.reshape(train_labels_600, (train_labels_600.shape[0] * train_labels_600.shape[1], train_labels_600.shape[2]))
+    val_data_600 = np.reshape(val_data_600, (val_data_600.shape[0] * val_data_600.shape[1], val_data_600.shape[2]))
+    val_labels_600 = np.reshape(val_labels_600, (val_labels_600.shape[0] * val_labels_600.shape[1], val_labels_600.shape[2]))
+    test_data_600 = np.reshape(test_data_600, (test_data_600.shape[0] * test_data_600.shape[1], test_data_600.shape[2]))
+    test_labels_600 = np.reshape(test_labels_600, (test_labels_600.shape[0] * test_labels_600.shape[1], test_labels_600.shape[2]))
+
+    train_data = np.append(train_data_840, train_data_600)
+    train_labels = np.append(train_labels_840, train_labels_600)
+    val_data = np.append(val_data_840, val_data_600)
+    val_labels = np.append(val_labels_840, val_labels_600)
+    test_data = np.append(test_data_840, test_data_600)
+    test_labels = np.append(test_labels_840, test_labels_600)
+
+    indices = np.random.permutation(len(train_data))
+
+    train_data = train_data[indices]
+    train_labels = train_labels[indices]
+
+    indices = np.random.permutation(len(val_data))
+
+    val_data = val_data[indices]
+    val_labels = val_labels[indices]
+
+    indices = np.random.permutation(len(test_data))
+
+    test_data = test_data[indices]
+    test_labels = test_labels[indices]
+
+    memory_info = process.memory_info()
+    array_memory = memory_info.rss - initial_memory
+    print(f"get_data() - train_data: {len(train_data)}, val_data: {len(val_data)}, test_data: {len(test_data)}, memory: {array_memory:,}")
+
+    return (train_data, train_labels, val_data, val_labels, test_data,
+            test_labels, class_weight)
+
+
+def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
 
     cursor = conn.cursor()
@@ -97,6 +225,7 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     SELECT start_time, end_time
     FROM sessions
     WHERE complete is true
+    AND holiday is false
     order by start_time
     """)
 
@@ -105,7 +234,7 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     memory_info = process.memory_info()
     initial_memory = memory_info.rss
 
-    data_minutes = []
+    data = []
     labels = []
 
     outcome_seconds = outcome_minutes * 60
@@ -130,6 +259,9 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
 
         timeseries_length_minus_one = timeseries_length - 1
         minute_index = timeseries_length_minus_one
+
+        session_data = []
+        session_labels = []
 
         while minute_index < len(minutes):
             window_minutes = []
@@ -157,37 +289,20 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
                                                 minutes[element_index][6]
                                             ], dtype=np.float32))
 
-            data_minutes.append(np.array(window_minutes, dtype=np.float32))
-            labels.append(minutes[minute_index][7] + 1)
+            session_data.append(np.array(window_minutes, dtype=np.float32))
+            session_labels.append(minutes[minute_index][7] + 1)
             minute_index = minute_index + skip_length
+
+        data.append(np.array(session_data))
+        labels.append(np.array(session_labels))
 
         memory_info = process.memory_info()
         array_memory = memory_info.rss - initial_memory
-        print(f"start_date: {session[0]}, count: {len(labels)}, memory: {array_memory:,}")
+        print(f"load_data() - start_date: {session[0]}, count: {len(labels)}, memory: {array_memory:,}")
 
-    d_count = {}
-    for label in labels:
-        if label not in d_count:
-            d_count[label] = 1
-        else:
-            d_count[label] = d_count[label] + 1
+    return np.array(data, dtype=np.float32), np.array(labels)
 
-    total_weights = 0
-    for count_label in d_count.keys():
-        total_weights = total_weights + d_count[count_label]
 
-    class_weight = {}
-    for count_label in [0, 1, 2]:
-        if d_count[count_label] == 0:
-            weight = 1
-        else:
-            weight = (1 / d_count[count_label]) * (total_weights / 3)
-
-        class_weight[count_label] = weight
-
-    print(f"class_weight: {class_weight}")
-
-    return np.array(data_minutes, dtype=np.float32), np.array(labels), class_weight
 
 
 def get_model(layer_count, base_units, flatten_units, dropout_percent, recurrent_dropout_percent, weight_decay):
