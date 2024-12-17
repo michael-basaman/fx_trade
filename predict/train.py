@@ -101,7 +101,55 @@ def get_data(timeseries_length, skip_length, outcome_minutes, pips):
     memory_info = process.memory_info()
     initial_memory = memory_info.rss
 
+    (train_data_840, train_data_600, train_labels_840, train_labels_600,
+     val_data_840, val_data_600, val_labels_840, val_labels_600,
+     test_data_840, test_data_600, test_labels_840, test_labels_600,
+     class_weight) = get_split(timeseries_length, skip_length, outcome_minutes, pips)
+
+    memory_info = process.memory_info()
+    array_memory = memory_info.rss - initial_memory
+    print(f"get_data() - data_840: {len(train_data_840)}, val_data_840: {len(val_data_840)}, test_data_840: {len(test_data_840)}, memory: {array_memory:,}")
+
+    train_data = np.concatenate((train_data_840, train_data_600), axis=0)
+    train_labels = np.concatenate((train_labels_840, train_labels_600), axis=0)
+    val_data = np.concatenate((val_data_840, val_data_600), axis=0)
+    val_labels = np.concatenate((val_labels_840, val_labels_600), axis=0)
+    test_data = np.concatenate((test_data_840, test_data_600), axis=0)
+    test_labels = np.concatenate((test_labels_840, test_labels_600), axis=0)
+
+    indices = np.random.permutation(len(train_data))
+
+    train_data = train_data[indices]
+    train_labels = train_labels[indices]
+
+    indices = np.random.permutation(len(val_data))
+
+    val_data = val_data[indices]
+    val_labels = val_labels[indices]
+
+    indices = np.random.permutation(len(test_data))
+
+    test_data = test_data[indices]
+    test_labels = test_labels[indices]
+
+    memory_info = process.memory_info()
+    array_memory = memory_info.rss - initial_memory
+    print(
+        f"get_data() - train_data: {len(train_data)}, val_data: {len(val_data)}, test_data: {len(test_data)}, memory: {array_memory:,}")
+
+    return (train_data, train_labels, val_data, val_labels, test_data,
+            test_labels, class_weight)
+
+
+def get_split(timeseries_length, skip_length, outcome_minutes, pips):
+    memory_info = process.memory_info()
+    initial_memory = memory_info.rss
+
     data_840, labels_840, data_600, labels_600 = load_data(timeseries_length, skip_length, outcome_minutes, pips)
+
+    memory_info = process.memory_info()
+    array_memory = memory_info.rss - initial_memory
+    print(f"get_split() - data_840: {len(data_840)}, data_600: {len(data_600)}, memory: {array_memory:,}")
 
     d_count = {}
     for session_labels in labels_840:
@@ -171,48 +219,30 @@ def get_data(timeseries_length, skip_length, outcome_minutes, pips):
     val_data_600 = nontest_data_600[split_index:]
     val_labels_600 = nontest_labels_600[split_index:]
 
-    train_data_840 = np.reshape(train_data_840, (train_data_840.shape[0] * train_data_840.shape[1], train_data_840.shape[2]))
-    train_labels_840 = np.reshape(train_labels_840, (train_labels_840.shape[0] * train_labels_840.shape[1], train_labels_840.shape[2]))
-    val_data_840 = np.reshape(val_data_840, (val_data_840.shape[0] * val_data_840.shape[1], val_data_840.shape[2]))
-    val_labels_840 = np.reshape(val_labels_840, (val_labels_840.shape[0] * val_labels_840.shape[1], val_labels_840.shape[2]))
-    test_data_840 = np.reshape(test_data_840, (test_data_840.shape[0] * test_data_840.shape[1], test_data_840.shape[2]))
-    test_labels_840 = np.reshape(test_labels_840, (test_labels_840.shape[0] * test_labels_840.shape[1], test_labels_840.shape[2]))
+    train_data_840 = np.reshape(train_data_840, (train_data_840.shape[0] * train_data_840.shape[1], train_data_840.shape[2], train_data_840.shape[3]))
+    train_labels_840 = np.reshape(train_labels_840, (train_labels_840.shape[0] * train_labels_840.shape[1]))
+    val_data_840 = np.reshape(val_data_840, (val_data_840.shape[0] * val_data_840.shape[1], val_data_840.shape[2], val_data_840.shape[3]))
+    val_labels_840 = np.reshape(val_labels_840, (val_labels_840.shape[0] * val_labels_840.shape[1]))
+    test_data_840 = np.reshape(test_data_840, (test_data_840.shape[0] * test_data_840.shape[1], test_data_840.shape[2], test_data_840.shape[3]))
+    test_labels_840 = np.reshape(test_labels_840, (test_labels_840.shape[0] * test_labels_840.shape[1]))
 
-    train_data_600 = np.reshape(train_data_600, (train_data_600.shape[0] * train_data_600.shape[1], train_data_600.shape[2]))
-    train_labels_600 = np.reshape(train_labels_600, (train_labels_600.shape[0] * train_labels_600.shape[1], train_labels_600.shape[2]))
-    val_data_600 = np.reshape(val_data_600, (val_data_600.shape[0] * val_data_600.shape[1], val_data_600.shape[2]))
-    val_labels_600 = np.reshape(val_labels_600, (val_labels_600.shape[0] * val_labels_600.shape[1], val_labels_600.shape[2]))
-    test_data_600 = np.reshape(test_data_600, (test_data_600.shape[0] * test_data_600.shape[1], test_data_600.shape[2]))
-    test_labels_600 = np.reshape(test_labels_600, (test_labels_600.shape[0] * test_labels_600.shape[1], test_labels_600.shape[2]))
-
-    train_data = np.append(train_data_840, train_data_600)
-    train_labels = np.append(train_labels_840, train_labels_600)
-    val_data = np.append(val_data_840, val_data_600)
-    val_labels = np.append(val_labels_840, val_labels_600)
-    test_data = np.append(test_data_840, test_data_600)
-    test_labels = np.append(test_labels_840, test_labels_600)
-
-    indices = np.random.permutation(len(train_data))
-
-    train_data = train_data[indices]
-    train_labels = train_labels[indices]
-
-    indices = np.random.permutation(len(val_data))
-
-    val_data = val_data[indices]
-    val_labels = val_labels[indices]
-
-    indices = np.random.permutation(len(test_data))
-
-    test_data = test_data[indices]
-    test_labels = test_labels[indices]
+    train_data_600 = np.reshape(train_data_600, (train_data_600.shape[0] * train_data_600.shape[1], train_data_600.shape[2], train_data_600.shape[3]))
+    train_labels_600 = np.reshape(train_labels_600, (train_labels_600.shape[0] * train_labels_600.shape[1]))
+    val_data_600 = np.reshape(val_data_600, (val_data_600.shape[0] * val_data_600.shape[1], val_data_600.shape[2], val_data_600.shape[3]))
+    val_labels_600 = np.reshape(val_labels_600, (val_labels_600.shape[0] * val_labels_600.shape[1]))
+    test_data_600 = np.reshape(test_data_600, (test_data_600.shape[0] * test_data_600.shape[1], test_data_600.shape[2], test_data_600.shape[3]))
+    test_labels_600 = np.reshape(test_labels_600, (test_labels_600.shape[0] * test_labels_600.shape[1]))
 
     memory_info = process.memory_info()
     array_memory = memory_info.rss - initial_memory
-    print(f"get_data() - train_data: {len(train_data)}, val_data: {len(val_data)}, test_data: {len(test_data)}, memory: {array_memory:,}")
+    print(f"get_split() - train_data_840: {len(train_data_840)}, train_data_600: {len(train_data_600)}, memory: {array_memory:,}")
 
-    return (train_data, train_labels, val_data, val_labels, test_data,
-            test_labels, class_weight)
+    return (train_data_840, train_data_600, train_labels_840, train_labels_600,
+            val_data_840, val_data_600, val_labels_840, val_labels_600,
+            test_data_840, test_data_600, test_labels_840, test_labels_600,
+            class_weight)
+
+
 
 
 def load_data(timeseries_length, skip_length, outcome_minutes, pips):
@@ -234,14 +264,20 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     memory_info = process.memory_info()
     initial_memory = memory_info.rss
 
-    data = []
-    labels = []
+    data_840 = []
+    labels_840 = []
+    data_600 = []
+    labels_600 = []
 
     outcome_seconds = outcome_minutes * 60
 
     for session in sessions:
         cursor2.execute("""
-        SELECT m.fx_datetime, m.close_price, m.macd, m.sma_60, m.macd, m.rsi, m.williams,
+        SELECT m.fx_datetime,
+               m.close_price,
+               m.close_price - m.min_price above,
+               m.close_price - m.open_price candle,
+               m.max_price - m.min_price tail,
                case when l.outcome_seconds > %s then 0
                else l.label end outcome_label
         FROM minutes m, labels2 l
@@ -277,32 +313,31 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
             stddev_price = math.sqrt(variance)
 
             if stddev_price == 0:
-                minute_index = minute_index + skip_length
-                continue
+                stddev_price = 1
 
             for element_index in range(minute_index - timeseries_length_minus_one, minute_index + 1):
                 window_minutes.append(np.array([(minutes[element_index][1] - avg_price) / stddev_price,
                                                 minutes[element_index][2],
                                                 minutes[element_index][3],
                                                 minutes[element_index][4],
-                                                minutes[element_index][5],
-                                                minutes[element_index][6]
                                             ], dtype=np.float32))
 
             session_data.append(np.array(window_minutes, dtype=np.float32))
-            session_labels.append(minutes[minute_index][7] + 1)
+            session_labels.append(minutes[minute_index][5] + 1)
             minute_index = minute_index + skip_length
 
-        data.append(np.array(session_data))
-        labels.append(np.array(session_labels))
+        if len(minutes) == 840:
+            data_840.append(np.array(session_data))
+            labels_840.append(np.array(session_labels))
+        elif len(minutes) == 600:
+            data_600.append(np.array(session_data))
+            labels_600.append(np.array(session_labels))
 
         memory_info = process.memory_info()
         array_memory = memory_info.rss - initial_memory
-        print(f"load_data() - start_date: {session[0]}, count: {len(labels)}, memory: {array_memory:,}")
+        print(f"load_data() - start_date: {session[0]}, count: {len(data_840) + len(data_600)}, memory: {array_memory:,}")
 
-    return np.array(data, dtype=np.float32), np.array(labels)
-
-
+    return np.array(data_840, dtype=np.float32), np.array(labels_840), np.array(data_600, dtype=np.float32), np.array(labels_600)
 
 
 def get_model(layer_count, base_units, flatten_units, dropout_percent, recurrent_dropout_percent, weight_decay):

@@ -1,8 +1,6 @@
 import psycopg2
-import numpy as np
 import time
 import psutil
-import math
 import datetime
 
 process = psutil.Process()
@@ -21,15 +19,10 @@ cursor.execute("SELECT start_time, end_time FROM weeks WHERE minutes > 0 order b
 
 weeks = cursor.fetchall()
 
-# log_minute = datetime.datetime.strptime("2003-05-05 03:11:00 -0400", "%Y-%m-%d %H:%M:%S %z")
-# found_minute = False
-
 fee = 40
 
-for pips_i in range(5, 6):
+for pips in [850]:
     total_count = 0
-
-    pips = pips_i * 100
 
     for week in weeks:
         count = 0
@@ -47,7 +40,7 @@ for pips_i in range(5, 6):
             continue
 
         cursor3.execute("""
-          SELECT start_time, end_time, complete
+          SELECT start_time, end_time
             FROM sessions
            WHERE start_time > %s
              AND end_time < %s
@@ -73,20 +66,10 @@ for pips_i in range(5, 6):
                 continue
 
             for minute in minutes:
-                # if log_minute == minute[0]:
-                #     print(f"found minute {minute[0].strftime("%Y-%m-%d %H:%M:%S")}")
-                #     found_minute = True
-
                 while tick_start < len(ticks):
                     if ticks[tick_start][0] < (minute[0] + datetime.timedelta(minutes=1)):
                         tick_start = tick_start + 1
-                        # if found_minute:
-                        #     print(f"not yet {ticks[tick_start][0].strftime("%Y-%m-%d %H:%M:%S")}, tick_start: {tick_start}")
-
                     else:
-                        # if found_minute:
-                        #     print(f"ready {ticks[tick_start][0].strftime("%Y-%m-%d %H:%M:%S")}, tick_start: {tick_start}")
-
                         break
 
                 if tick_start >= len(ticks):
@@ -100,9 +83,6 @@ for pips_i in range(5, 6):
 
                 initial_bid = ticks[tick_index][1]
                 initial_ask = ticks[tick_index][2]
-
-                # if found_minute:
-                #     print(f"initial_bid: {initial_bid}, initial_ask: {initial_ask}, tick_index: {tick_index}, tick: {ticks[tick_index][0].strftime("%Y-%m-%d %H:%M:%S")}")
 
                 tick_index = tick_index + 1
 
@@ -118,40 +98,22 @@ for pips_i in range(5, 6):
                     buy_profit = buy_profit - fee
                     sell_profit = sell_profit - fee
 
-                    # if found_minute:
-                    #     print(f"buy_profit: {buy_profit}, sell_profit: {sell_profit}, tick_index: {tick_index}, tick: {ticks[tick_index][0].strftime("%Y-%m-%d %H:%M:%S")}")
-
                     tick_index = tick_index + 1
 
                     if buy_profit < (-1 * pips):
-                        # if found_minute:
-                        #     print("setting shouldBuy to false")
-
                         shouldBuy = False
 
                     if sell_profit < (-1 * pips):
-                        # if found_minute:
-                        #     print("setting shouldSell to false")
-
                         shouldSell = False
 
                     if not shouldBuy and not shouldSell:
-                        # if found_minute:
-                        #     print("breaking with shouldBuy and shouldSell both false")
-
                         break
 
                     if shouldBuy and buy_profit > pips:
-                        # if found_minute:
-                        #     print("breaking with buyWins true")
-
                         buyWins = True
                         break
 
                     if shouldSell and sell_profit > pips:
-                        # if found_minute:
-                        #     print("breaking with shouldSell true")
-
                         sellWins = True
                         break
 
@@ -166,10 +128,6 @@ for pips_i in range(5, 6):
                 if tick_index < len(ticks):
                     outcome_seconds = (ticks[tick_index][0] - minute[0]).total_seconds()
                     outcome_seconds = outcome_seconds - 60
-
-                    # if found_minute:
-                    #     print(f"outcome_seconds: {outcome_seconds}, {ticks[tick_index][0].strftime("%Y-%m-%d %H:%M:%S")} - {minute[0].strftime("%Y-%m-%d %H:%M:%S")}")
-                    #     exit(1)
                 else:
                     outcome_seconds = 0
 
