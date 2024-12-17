@@ -126,3 +126,10 @@ and s.complete is true;
 insert into normals (name, value) values ('above_average', 154.3566921288608436);
 insert into normals (name, value) values ('above_stddev', 181.362258560728);
 
+create or replace function get_week_number(date_in timestamp with time zone)
+ returns   integer
+ language  sql
+ immutable strict
+as $$
+    select cast(FLOOR(EXTRACT(DAY FROM date_in) / 7 - 0.01) as INTEGER) + 1
+$$;

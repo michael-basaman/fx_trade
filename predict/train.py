@@ -21,21 +21,16 @@ def main():
     timeseries_length = 30
     skip_length = 1
     outcome_minutes = 15
-    pips = 500
-    patience = 100
+    pips = 850
+    patience = 50
 
     start_time = time.time()
 
     # data, labels, class_weight = load_data(timeseries_length, skip_length, outcome_minutes, pips)
     #
-    # print(f"loaded {len(data)} sequences in {format_seconds(time.time() - start_time)}")
-    # start_time = time.time()
-    #
     # x_train, x_test, y_train, y_test = train_test_split(
     #     data, labels, test_size=TEST_SIZE
     # )
-    #
-    # print(f"split {len(data)} sequences in {format_seconds(time.time() - start_time)}")
 
     memory_info = process.memory_info()
     initial_memory = memory_info.rss
@@ -47,52 +42,48 @@ def main():
     print(
         f"Loaded {len(train_data) + len(val_data) + len(test_data)} minutes in {format_seconds(time.time() - start_time)}, memory: {array_memory:,}")
 
-    if patience > 0:
-        exit(1)
+    dropouts = [(0, 0, 0), (20, 0, 0), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
 
-    for flatten_units in [128, 64, 0]:
-        for layer_count in [3, 2]:
-            for base_units in [128, 64, 32, 256]:
-                for recurrent_dropout_percent in [10, 0]:
-                    for dropout_percent in [20, 0]:
-                        for weight_decay in [1, 10, 0]:
-                            start_time = time.time()
+    for base_units in [128, 64, 256]:
+        for layer_count in [3, 2, 4]:
+            for flatten in [False, True]:
+                for dropout_percent, recurrent_dropout_percent, weight_decay in dropouts:
+                    start_time = time.time()
 
-                            checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_c{layer_count}_u{base_units:03d}_f{flatten_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
+                    checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{now_str}_c{layer_count}_u{base_units:03d}_f{'T' if flatten else 'F'}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
 
-                            tf.keras.backend.clear_session()
-                            model = get_model(layer_count, base_units, flatten_units, dropout_percent, recurrent_dropout_percent, weight_decay)
+                    tf.keras.backend.clear_session()
+                    model = get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropout_percent, weight_decay)
 
-                            cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
-                                                                             monitor='val_loss',
-                                                                             mode='min',
-                                                                             save_best_only=True,
-                                                                             save_weights_only=False,
-                                                                             verbose=1)
+                    cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
+                                                                     monitor='val_loss',
+                                                                     mode='min',
+                                                                     save_best_only=True,
+                                                                     save_weights_only=False,
+                                                                     verbose=1)
 
-                            early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
-                                                                              mode='min',
-                                                                              patience=patience,
-                                                                              restore_best_weights=True,
-                                                                              start_from_epoch=patience,
-                                                                              verbose=1)
+                    early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss',
+                                                                      mode='min',
+                                                                      patience=patience,
+                                                                      restore_best_weights=True,
+                                                                      start_from_epoch=patience,
+                                                                      verbose=1)
 
-                            model.fit(train_data, train_labels,
-                                      epochs=10000,
-                                      callbacks=[early_stopping, cp_callback],
-                                      class_weight=class_weight,
-                                      batch_size=64,
-                                      validation_data=(val_data, val_labels))
+                    model.fit(train_data, train_labels,
+                              epochs=10000,
+                              callbacks=[early_stopping, cp_callback],
+                              # class_weight=class_weight,
+                              validation_data=(val_data, val_labels))
 
-                            print(f"trained model in {format_seconds(time.time() - start_time)}")
-                            start_time = time.time()
+                    print(f"trained model in {format_seconds(time.time() - start_time)}")
+                    start_time = time.time()
 
-                            loss, accuracy = model.evaluate(test_data, test_labels, verbose=1)
+                    loss, accuracy = model.evaluate(test_data, test_labels, verbose=1)
 
-                            print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
+                    print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
 
-                            model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count}_u{base_units:03d}_f{flatten_units:03d}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
-                            shutil.move(checkpoint_path, model_path)
+                    model_path = f"C:/VirtualBox/rsync/fx_trade/models/{now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count}_u{base_units:03d}_f{'T' if flatten else 'F'}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
+                    shutil.move(checkpoint_path, model_path)
 
     print(f"finished in {format_seconds(time.time() - start_time)}")
 
@@ -243,8 +234,6 @@ def get_split(timeseries_length, skip_length, outcome_minutes, pips):
             class_weight)
 
 
-
-
 def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
 
@@ -340,31 +329,28 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     return np.array(data_840, dtype=np.float32), np.array(labels_840), np.array(data_600, dtype=np.float32), np.array(labels_600)
 
 
-def get_model(layer_count, base_units, flatten_units, dropout_percent, recurrent_dropout_percent, weight_decay):
+def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropout_percent, weight_decay):
     if layer_count <= 0:
         print(f"invalid layer_count: {layer_count}")
         exit(1)
-
-    if flatten_units > 0:
-        lstm_layer_count = layer_count
-    else:
-        lstm_layer_count = layer_count + 1
 
     dropout = dropout_percent / 100.0
     recurrent_dropout = recurrent_dropout_percent / 100.0
     weight_decay_fraction = weight_decay / 10000.0
 
     model = tf.keras.models.Sequential()
-    print("tf.keras.models.Sequential([")
+    print(f"get_model({layer_count}, {base_units}, {flatten}, {dropout_percent}, {recurrent_dropout_percent}, {weight_decay})")
+    print()
+    print("Sequential([")
 
-    for label_index in range(0, lstm_layer_count):
-        layer_power = lstm_layer_count - label_index - 1
+    for label_index in range(0, layer_count):
+        layer_power = layer_count - label_index - 1
         layer_multiple = 1
         for i in range(layer_power):
             layer_multiple = layer_multiple * 2
         layer_units = base_units * layer_multiple
 
-        if flatten_units > 0:
+        if flatten:
             return_sequences = True
         elif layer_power > 0:
             return_sequences = True
@@ -372,51 +358,53 @@ def get_model(layer_count, base_units, flatten_units, dropout_percent, recurrent
             return_sequences = False
 
         if weight_decay > 0:
-            model.add(tf.keras.layers.LSTM(layer_units,
+            model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(layer_units,
                                            dropout=dropout,
                                            recurrent_dropout=recurrent_dropout,
                                            return_sequences=return_sequences,
                                            kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction),
-                                           recurrent_regularizer=tf.keras.regularizers.l2(weight_decay_fraction)))
-            print(f"\ttf.keras.layers.LSTM({layer_units},")
-            print(f"\t\tdropout={dropout},")
-            print(f"\t\trecurrent_dropout={recurrent_dropout},")
-            print(f"\t\treturn_sequences={return_sequences},")
-            print(f"\t\tkernel_regularizer=tf.keras.regularizers.l2({weight_decay_fraction}),")
-            print(f"\t\trecurrent_regularizer=tf.keras.regularizers.l2({weight_decay_fraction})),")
+                                           recurrent_regularizer=tf.keras.regularizers.l2(weight_decay_fraction))))
+
+            print(f"    LSTM({layer_units},")
+            print(f"         dropout={dropout},")
+            print(f"         recurrent_dropout={recurrent_dropout},")
+            print(f"         return_sequences={return_sequences},")
+            print(f"         kernel_regularizer=l2({weight_decay_fraction}),")
+            print(f"         recurrent_regularizer=l2({weight_decay_fraction})),")
 
         else:
-            model.add(tf.keras.layers.LSTM(layer_units,
+            model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(layer_units,
                                            dropout=dropout,
                                            recurrent_dropout=recurrent_dropout,
-                                           return_sequences=return_sequences))
-            print(f"\ttf.keras.layers.LSTM({layer_units},")
-            print(f"\t\tdropout={dropout},")
-            print(f"\t\trecurrent_dropout={recurrent_dropout},")
-            print(f"\t\treturn_sequences={return_sequences}),")
+                                           return_sequences=return_sequences)))
 
-    if flatten_units > 0:
+            print(f"    LSTM({layer_units},")
+            print(f"         dropout={dropout},")
+            print(f"         recurrent_dropout={recurrent_dropout},")
+            print(f"         return_sequences={return_sequences}),")
+
+    if flatten:
         model.add(tf.keras.layers.Flatten())
-        print(f"\ttf.keras.layers.Flatten(),")
+        print(f"    Flatten(),")
 
-        if weight_decay > 0:
-            model.add(tf.keras.layers.Dense(flatten_units,
-                                            activation="relu",
-                                            kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction)))
-            print(f"\ttf.keras.layers.Dense({flatten_units},")
-            print(f"\t\tactivation='relu',")
-            print(f"\t\tkernel_regularizer=tf.keras.regularizers.l2({weight_decay_fraction}))")
-        else:
-            model.add(tf.keras.layers.Dense(flatten_units,
-                                            activation="relu"))
-            print(f"\ttf.keras.layers.Dense({flatten_units},")
-            print(f"\t\tactivation='relu')")
+    if weight_decay > 0:
+        model.add(tf.keras.layers.Dense(base_units,
+                                        activation="relu",
+                                        kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction)))
 
-        model.add(tf.keras.layers.Dropout(0.2))
-        print(f"\ttf.keras.layers.Dropout(0.2)")
+        print(f"    Dense({base_units},")
+        print(f"          activation='relu',")
+        print(f"          kernel_regularizer=tf.keras.regularizers.l2({weight_decay_fraction})),")
+    else:
+        model.add(tf.keras.layers.Dense(base_units, activation="relu"))
+        print(f"    Dense({base_units}, activation='relu'),")
+
+    model.add(tf.keras.layers.Dropout(0.2))
+    print(f"    Dropout(0.2),")
 
     model.add(tf.keras.layers.Dense(3, activation="softmax"))
-    print(f"\ttf.keras.layers.Dense(3, activation='softmax')]")
+    print(f"    Dense(3, activation='softmax')")
+    print(f"]")
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
