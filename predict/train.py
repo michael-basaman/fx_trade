@@ -44,8 +44,8 @@ def main():
 
     dropouts = [(0, 0, 0), (20, 0, 0), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
 
-    for base_units in [128, 64, 256]:
-        for layer_count in [3, 2, 4]:
+    for layer_count in [3, 2, 4]:
+        for base_units in [128, 64, 256]:
             for flatten in [False, True]:
                 for dropout_percent, recurrent_dropout_percent, weight_decay in dropouts:
                     start_time = time.time()
@@ -329,7 +329,7 @@ def load_data(timeseries_length, skip_length, outcome_minutes, pips):
     return np.array(data_840, dtype=np.float32), np.array(labels_840), np.array(data_600, dtype=np.float32), np.array(labels_600)
 
 
-def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropout_percent, weight_decay):
+def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropout_percent, weight_decay, print_model=False):
     if layer_count <= 0:
         print(f"invalid layer_count: {layer_count}")
         exit(1)
@@ -339,9 +339,11 @@ def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropo
     weight_decay_fraction = weight_decay / 10000.0
 
     model = tf.keras.models.Sequential()
-    print(f"get_model({layer_count}, {base_units}, {flatten}, {dropout_percent}, {recurrent_dropout_percent}, {weight_decay})")
-    print()
-    print("Sequential([")
+
+    if print_model:
+        print(f"get_model({layer_count}, {base_units}, {flatten}, {dropout_percent}, {recurrent_dropout_percent}, {weight_decay})")
+        print()
+        print("Sequential([")
 
     for label_index in range(0, layer_count):
         layer_power = layer_count - label_index - 1
@@ -365,12 +367,13 @@ def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropo
                                            kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction),
                                            recurrent_regularizer=tf.keras.regularizers.l2(weight_decay_fraction))))
 
-            print(f"    LSTM({layer_units},")
-            print(f"         dropout={dropout},")
-            print(f"         recurrent_dropout={recurrent_dropout},")
-            print(f"         return_sequences={return_sequences},")
-            print(f"         kernel_regularizer=l2({weight_decay_fraction}),")
-            print(f"         recurrent_regularizer=l2({weight_decay_fraction})),")
+            if print_model:
+                print(f"    LSTM({layer_units},")
+                print(f"         dropout={dropout},")
+                print(f"         recurrent_dropout={recurrent_dropout},")
+                print(f"         return_sequences={return_sequences},")
+                print(f"         kernel_regularizer=l2({weight_decay_fraction}),")
+                print(f"         recurrent_regularizer=l2({weight_decay_fraction})),")
 
         else:
             model.add(tf.keras.layers.Bidirectional(tf.keras.layers.LSTM(layer_units,
@@ -378,33 +381,43 @@ def get_model(layer_count, base_units, flatten, dropout_percent, recurrent_dropo
                                            recurrent_dropout=recurrent_dropout,
                                            return_sequences=return_sequences)))
 
-            print(f"    LSTM({layer_units},")
-            print(f"         dropout={dropout},")
-            print(f"         recurrent_dropout={recurrent_dropout},")
-            print(f"         return_sequences={return_sequences}),")
+            if print_model:
+                print(f"    LSTM({layer_units},")
+                print(f"         dropout={dropout},")
+                print(f"         recurrent_dropout={recurrent_dropout},")
+                print(f"         return_sequences={return_sequences}),")
 
     if flatten:
         model.add(tf.keras.layers.Flatten())
-        print(f"    Flatten(),")
+
+        if print_model:
+            print(f"    Flatten(),")
 
     if weight_decay > 0:
         model.add(tf.keras.layers.Dense(base_units,
                                         activation="relu",
                                         kernel_regularizer=tf.keras.regularizers.l2(weight_decay_fraction)))
 
-        print(f"    Dense({base_units},")
-        print(f"          activation='relu',")
-        print(f"          kernel_regularizer=tf.keras.regularizers.l2({weight_decay_fraction})),")
+        if print_model:
+            print(f"    Dense({base_units},")
+            print(f"          activation='relu',")
+            print(f"          kernel_regularizer=tf.keras.regularizers.l2({weight_decay_fraction})),")
     else:
         model.add(tf.keras.layers.Dense(base_units, activation="relu"))
-        print(f"    Dense({base_units}, activation='relu'),")
+
+        if print_model:
+            print(f"    Dense({base_units}, activation='relu'),")
 
     model.add(tf.keras.layers.Dropout(0.2))
-    print(f"    Dropout(0.2),")
+
+    if print_model:
+        print(f"    Dropout(0.2),")
 
     model.add(tf.keras.layers.Dense(3, activation="softmax"))
-    print(f"    Dense(3, activation='softmax')")
-    print(f"]")
+
+    if print_model:
+        print(f"    Dense(3, activation='softmax')")
+        print(f"]")
 
     model.compile(
         optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
