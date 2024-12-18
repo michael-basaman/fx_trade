@@ -36,10 +36,9 @@ class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
 
         if epoch == 0:
             self._last_time = now
-            return
-
-        print(f"Epoch {epoch}: ran in {format_seconds(now - self._last_time)}")
-        self._last_time = now
+        else:
+            print(f"Epoch {epoch}: ran in {format_seconds(now - self._last_time)}")
+            self._last_time = now
 
         if os.path.isfile(self._checkpoint_path):
             md5sum = self.get_md5sum()
@@ -53,7 +52,7 @@ class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
                 print(f"Epoch {epoch}: new checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._accuracy:.6f}")
             else:
                 print(f"Epoch {epoch}: same checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._accuracy:.6f}")
-        else:
+        elif epoch > 0:
             print(f"Epoch {epoch}: checkpoint {self._checkpoint_path} not found")
 
 
@@ -63,6 +62,11 @@ class FxTrainer():
         self._now = datetime.datetime.now()
         self._now_str = self._now.strftime("%Y%m%d%H%M%S")
         self._seed_str = self._now.strftime("%m%d%H%M%S")
+        self._seed = int(self._seed_str)
+
+    def set_nowstr(self, now_str):
+        self._now_str = now_str
+        self._seed_str = now_str[4:]
         self._seed = int(self._seed_str)
 
     def run(self):
@@ -100,12 +104,17 @@ class FxTrainer():
 
                         tf.keras.backend.clear_session()
 
-                        model = self.get_model(layer_count,
-                                               base_units,
-                                               flatten,
-                                               dropout_percent,
-                                               recurrent_dropout_percent,
-                                               weight_decay)
+                        if os.path.isfile(checkpoint_path):
+                            print(f"Loading model from checkpoint: {checkpoint_path}")
+
+                            model = tf.keras.models.load_model(checkpoint_path)
+                        else:
+                            model = self.get_model(layer_count,
+                                                   base_units,
+                                                   flatten,
+                                                   dropout_percent,
+                                                   recurrent_dropout_percent,
+                                                   weight_decay)
 
                         cp_callback = tf.keras.callbacks.ModelCheckpoint(filepath=checkpoint_path,
                                                                          monitor='val_loss',
