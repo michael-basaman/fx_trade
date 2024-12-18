@@ -532,7 +532,7 @@ class FxTrainer():
             print(f"]")
 
         model.compile(
-            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0001),
+            optimizer=tf.keras.optimizers.Adam(learning_rate=0.0003),
             loss = 'sparse_categorical_crossentropy',
             metrics=["accuracy"]
         )
