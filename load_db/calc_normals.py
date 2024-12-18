@@ -15,6 +15,7 @@ cursor.execute("""
     SELECT start_time, end_time
     FROM sessions
     WHERE complete is true
+    and holiday is false
     order by start_time
     """)
 

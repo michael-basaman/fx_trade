@@ -23,7 +23,7 @@ fee = 40
 
 week_count = 0
 
-for outcome_minutes in [15]:
+for outcome_minutes in [30]:
     start_time = time.time()
 
     outcome_minutes_plus_one = outcome_minutes + 1
@@ -155,7 +155,6 @@ for outcome_minutes in [15]:
     cursor5.execute("INSERT INTO normals (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_average", average_profit))
     cursor5.execute("INSERT INTO normals (name, value) VALUES (%s, %s)", (f"profit_{outcome_minutes}_stddev", stddev))
     conn.commit()
-
 
     elapsed_time = time.time() - start_time
     print(f"elapsed_time: {elapsed_time}")
