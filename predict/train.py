@@ -49,9 +49,9 @@ class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
                 self._loss = loss
                 self._accuracy = accuracy
 
-                print(f"Epoch {epoch}: new checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._accuracy:.6f}")
+                print(f"Epoch {epoch}: new checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._loss:.6f}")
             else:
-                print(f"Epoch {epoch}: same checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._accuracy:.6f}")
+                print(f"Epoch {epoch}: same checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._loss:.6f}")
         elif epoch > 0:
             print(f"Epoch {epoch}: checkpoint {self._checkpoint_path} not found")
 
@@ -377,7 +377,7 @@ class FxTrainer():
                    m.max_price - m.min_price tail,
                    case when l.outcome_seconds > %s then 0
                    else l.label end outcome_label
-            FROM minutes m, labels2 l
+            FROM minutes m, labels l
             WHERE m.fx_datetime >= %s
             AND m.fx_datetime < %s
             AND l.pips = %s

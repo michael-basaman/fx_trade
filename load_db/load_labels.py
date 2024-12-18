@@ -132,7 +132,7 @@ for pips in [850]:
                     outcome_seconds = 0
 
                 cursor5.execute("""
-                INSERT INTO labels2 (pips, fx_datetime, label, outcome_seconds)
+                INSERT INTO labels (pips, fx_datetime, label, outcome_seconds)
                 VALUES (%s, %s, %s, %s)
                 """, (pips, minute[0], label, outcome_seconds,))
 
