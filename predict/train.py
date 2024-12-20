@@ -14,22 +14,36 @@ from sklearn.model_selection import train_test_split
 
 
 class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
-    def __init__(self, test_data, test_labels, checkpoint_path):
+    def __init__(self, test_data, test_labels, results_path, checkpoint_path, patience):
         self._test_data = test_data
         self._test_labels = test_labels
+        self._results_path = results_path
         self._checkpoint_path = checkpoint_path
+        self._patience = patience
         self._md5sum = ""
         self._loss = 0
         self._accuracy = 0
         self._last_time = 0
+        self._same_count = 0
 
     def get_md5sum(self):
         with open(self._checkpoint_path, "rb") as f:
             file_hash = hashlib.md5()
+
             while chunk := f.read(8192):
                 file_hash.update(chunk)
 
         return file_hash.hexdigest()
+
+    def should_early_terminate(self):
+        print(f"Checking for early termination: {self._results_path}")
+
+        return os.path.isfile(self._results_path)
+
+    def on_epoch_end(self, epoch, logs=None):
+        if self.should_early_terminate():
+            print("Results found, stopping training.")
+            self.model.stop_training = True
 
     def on_epoch_begin(self, epoch, logs=None):
         now = time.time()
@@ -42,16 +56,21 @@ class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
 
         if os.path.isfile(self._checkpoint_path):
             md5sum = self.get_md5sum()
+
             if md5sum != self._md5sum:
                 loss, accuracy = self.model.evaluate(self._test_data, self._test_labels, verbose=1)
 
-                self._md5sum = md5sum
+                self._same_count = 0
                 self._loss = loss
                 self._accuracy = accuracy
 
-                print(f"Epoch {epoch}: new checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._loss:.6f}")
+                print(f"Epoch {epoch}: new checkpoint: {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
             else:
-                print(f"Epoch {epoch}: same checkpoint: {md5sum}, test accuracy: {self._accuracy:.6f}, loss: {self._loss:.6f}")
+                self._same_count = self._same_count + 1
+                print(
+                    f"Epoch {epoch}: same checkpoint ({self._same_count}/{self._patience}: {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
+
+            self._md5sum = md5sum
         elif epoch > 0:
             print(f"Epoch {epoch}: checkpoint {self._checkpoint_path} not found")
 
@@ -71,11 +90,13 @@ class FxTrainer():
 
     def run(self):
         timeseries_length = 30
-        skip_length = 1
+        skip_length = 5
         outcome_minutes = 15
         pips = 850
         patience = 10
         self_split = True
+
+        self.set_nowstr("20241218065812")
 
         start_time = time.time()
 
@@ -100,7 +121,15 @@ class FxTrainer():
                     for dropout_percent, recurrent_dropout_percent, weight_decay in dropouts:
                         start_time = time.time()
 
-                        checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{self._now_str}_c{layer_count}_u{base_units:03d}_f{'T' if flatten else 'F'}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
+                        checkpoint_string = f"{self._now_str}_c{layer_count}_u{base_units:03d}_f{'T' if flatten else 'F'}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}"
+
+                        results_path = f"C:/VirtualBox/rsync/fx_trade/results/{checkpoint_string}.results"
+                        checkpoint_path = f"C:/VirtualBox/rsync/fx_trade/checkpoints/{checkpoint_string}.model.keras"
+
+                        print(f"Processing checkpoint: {checkpoint_path}")
+
+                        if os.path.isfile(results_path):
+                            continue
 
                         tf.keras.backend.clear_session()
 
@@ -130,7 +159,8 @@ class FxTrainer():
                                                                           start_from_epoch=patience,
                                                                           verbose=1)
 
-                        evaluate_test_data = EvaluateTestDataCallback(test_data, test_labels, checkpoint_path)
+                        evaluate_test_data = EvaluateTestDataCallback(test_data, test_labels, results_path,
+                                                                      checkpoint_path, patience)
 
                         model.fit(train_data, train_labels,
                                   epochs=10000,
@@ -138,17 +168,22 @@ class FxTrainer():
                                   # class_weight=class_weight,
                                   validation_data=(val_data, val_labels))
 
-                        print(f"trained model in {format_seconds(time.time() - start_time)}")
-                        start_time = time.time()
+                        print(f"Trained model in {format_seconds(time.time() - start_time)}")
 
                         loss, accuracy = model.evaluate(test_data, test_labels, verbose=1)
 
-                        print(f"accuracy: {accuracy:.6f}, loss: {loss:.6f}")
+                        print(f"test_accuracy: {accuracy:.6f}, test_loss: {loss:.6f}")
+
+                        print(f"Saving results: {results_path}")
+                        with open(results_path, 'w', encoding='utf-8') as f:
+                            f.write(f"test_accuracy: {accuracy:.6f}, test_loss: {loss:.6f}")
 
                         model_path = f"C:/VirtualBox/rsync/fx_trade/models/{self._now_str}_l{int(10000 * loss):05d}_a{int(10000 * accuracy):05d}_c{layer_count}_u{base_units:03d}_f{'T' if flatten else 'F'}_d{dropout_percent:02d}_r{recurrent_dropout_percent:02d}_w{weight_decay:02d}.model.keras"
+
+                        print(f"Saving model: {model_path}")
                         shutil.move(checkpoint_path, model_path)
 
-        print(f"finished in {format_seconds(time.time() - start_time)}")
+        print(f"finished")
 
     def get_data(self, timeseries_length, skip_length, outcome_minutes, pips, self_split):
         memory_info = self._process.memory_info()
