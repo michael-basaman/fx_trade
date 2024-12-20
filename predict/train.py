@@ -64,11 +64,11 @@ class EvaluateTestDataCallback(tf.keras.callbacks.Callback):
                 self._loss = loss
                 self._accuracy = accuracy
 
-                print(f"Epoch {epoch}: new checkpoint: {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
+                print(f"Epoch {epoch}: new checkpoint {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
             else:
                 self._same_count = self._same_count + 1
                 print(
-                    f"Epoch {epoch}: same checkpoint ({self._same_count}/{self._patience}: {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
+                    f"Epoch {epoch}: same checkpoint ({self._same_count}/{self._patience}) {md5sum}, test_accuracy: {self._accuracy:.6f}, test_loss: {self._loss:.6f}")
 
             self._md5sum = md5sum
         elif epoch > 0:
@@ -93,7 +93,7 @@ class FxTrainer():
         skip_length = 5
         outcome_minutes = 15
         pips = 850
-        patience = 10
+        patience = 25
         self_split = True
 
         self.set_nowstr("20241218065812")
