@@ -93,7 +93,7 @@ class FxTrainer():
         skip_length = 5
         outcome_minutes = 15
         pips = 850
-        patience = 25
+        patience = 10
         self_split = True
 
         self.set_nowstr("20241218065812")
