@@ -170,6 +170,11 @@ class FxTrainer():
 
                         print(f"Trained model in {format_seconds(time.time() - start_time)}")
 
+                        if os.path.isfile(checkpoint_path):
+                            print(f"Loading model from checkpoint: {checkpoint_path}")
+                            tf.keras.backend.clear_session()
+                            model = tf.keras.models.load_model(checkpoint_path)
+                            
                         loss, accuracy = model.evaluate(test_data, test_labels, verbose=1)
 
                         print(f"test_accuracy: {accuracy:.6f}, test_loss: {loss:.6f}")
