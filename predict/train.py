@@ -113,7 +113,7 @@ class FxTrainer():
         print(
             f"Loaded {len(train_data) + len(val_data) + len(test_data)} minutes in {format_seconds(time.time() - start_time)}, memory: {array_memory:,}")
 
-        dropouts = [(0, 0, 0), (20, 0, 0), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
+        dropouts = [(0, 0, 0), (20, 0, 0), (0, 10, 0), (0, 0, 1), (0, 0, 10), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
 
         for layer_count in [3, 2, 4]:
             for base_units in [128, 64, 256]:
