@@ -1,6 +1,7 @@
 import datetime
 import psycopg2
 
+
 conn = psycopg2.connect(database="fx", user="fx", password="fx", host="localhost", port=5432)
 
 cursor = conn.cursor()
