@@ -89,14 +89,16 @@ class FxTrainer():
         self._seed = int(self._seed_str)
 
     def run(self):
-        timeseries_length = 30
-        skip_length = 5
+        timeseries_length = 60
+        skip_length = 15
         outcome_minutes = 15
         pips = 850
-        patience = 10
+        patience = 50
         self_split = True
 
-        self.set_nowstr("20241218065812")
+        # self.set_nowstr("20241218065812")
+        # self.set_nowstr("20241224222328")
+        self.set_nowstr("20241225114209")
 
         start_time = time.time()
 
@@ -113,10 +115,11 @@ class FxTrainer():
         print(
             f"Loaded {len(train_data) + len(val_data) + len(test_data)} minutes in {format_seconds(time.time() - start_time)}, memory: {array_memory:,}")
 
-        dropouts = [(0, 0, 0), (20, 0, 0), (0, 10, 0), (0, 0, 1), (0, 0, 10), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
+        # dropouts = [(0, 0, 0), (20, 0, 0), (0, 10, 0), (0, 0, 1), (0, 0, 10), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
+        dropouts = [(0, 0, 0), (20, 0, 0), (20, 10, 0), (20, 10, 1), (20, 10, 10)]
 
-        for layer_count in [3, 2, 4]:
-            for base_units in [128, 64, 256]:
+        for layer_count in [3]:
+            for base_units in [64]:
                 for flatten in [False, True]:
                     for dropout_percent, recurrent_dropout_percent, weight_decay in dropouts:
                         start_time = time.time()
