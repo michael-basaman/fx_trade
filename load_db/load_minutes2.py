@@ -11,8 +11,6 @@ cursor.execute("select start_time, end_time from weeks order by start_time");
 
 records = cursor.fetchall()
 
-count = 0
-
 for record in records:
     start_time = record[0]
     end_time = record[1]
@@ -44,32 +42,36 @@ for record in records:
             minutes_array.append(minute)
             minutes_dict[minute] = []
 
-        minutes_dict[minute].append(int((float(bid + ask) / 2.0) + 0.01))
+        minutes_dict[minute].append((bid, ask))
 
     for minute in minutes_array:
+        open_bid = minutes_dict[minute][0][0]
+        open_ask = minutes_dict[minute][0][1]
+        close_bid = minutes_dict[minute][-1][0]
+        close_ask = minutes_dict[minute][-1][1]
+        min_bid = open_bid
+        min_ask = open_ask
+        max_bid = open_bid
+        max_ask = open_ask
 
-        open_price = minutes_dict[minute][0]
-        close_price = minutes_dict[minute][-1]
-        min_price = open_price
-        max_price = close_price
-
-        for price in minutes_dict[minute]:
-            if price < min_price:
-                min_price = price
-            if price > max_price:
-                max_price = price
+        for bid, ask in minutes_dict[minute]:
+            if bid < min_bid:
+                min_bid = bid
+            if ask < min_ask:
+                min_ask = ask
+            if bid > max_bid:
+                max_bid = bid
+            if ask > max_ask:
+                max_ask = ask
 
         cursor3.execute("""
-        INSERT INTO minutes (fx_datetime, open_price, close_price, min_price, max_price)
-        VALUES (%s, %s, %s, %s, %s)
-        """, (minute, open_price, close_price, min_price, max_price,))
-
-        count = count + 1
-
-        if count % 1000 == 0:
-            print(count)
+        INSERT INTO minutes2 (fx_datetime, open_bid, open_ask, close_bid, close_ask, min_bid, min_ask, max_bid, max_ask, ticks)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+        """, (minute, open_bid, open_ask, close_bid, close_ask, min_bid, min_ask, max_bid, max_ask, len(minutes_dict[minute])))
 
     conn.commit()
+
+    print(start_time)
 
 
 
